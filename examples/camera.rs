@@ -1,6 +1,5 @@
 use bevy::prelude::*;
 use bevy_gstreamer::camera::GstCamera;
-use bevy_gstreamer::types::{CameraFormat, FrameFormat, Resolution};
 
 fn main() {
     App::new()
@@ -10,8 +9,7 @@ fn main() {
 }
 
 fn setup_camera(mut commands: Commands) {
-    commands.spawn(GstCamera::new(
-        0,
-        CameraFormat::new(Resolution::new(640, 480), FrameFormat::MJPEG, 30),
-    ));
+    let mut camera = GstCamera::new(0, None).unwrap();
+    camera.open_stream().unwrap();
+    commands.spawn(camera);
 }

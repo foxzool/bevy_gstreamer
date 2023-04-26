@@ -1,3 +1,6 @@
+use crate::error::BevyGstError;
+use std::fmt::{Display, Formatter};
+
 #[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
 pub struct Resolution {
     pub width_x: u32,
@@ -22,12 +25,43 @@ pub enum FrameFormat {
     RAWRGB,
 }
 
+impl Display for FrameFormat {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FrameFormat::MJPEG => {
+                write!(f, "MJPG")
+            }
+            FrameFormat::YUYV => {
+                write!(f, "YUYV")
+            }
+            FrameFormat::GRAY => {
+                write!(f, "GRAY")
+            }
+            FrameFormat::RAWRGB => {
+                write!(f, "RAWRGB")
+            }
+            FrameFormat::NV12 => {
+                write!(f, "NV12")
+            }
+        }
+    }
+}
 
 #[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
 pub struct CameraFormat {
     resolution: Resolution,
     format: FrameFormat,
     frame_rate: u32,
+}
+
+impl Default for CameraFormat {
+    fn default() -> Self {
+        Self {
+            resolution: Resolution::new(640, 480),
+            format: FrameFormat::MJPEG,
+            frame_rate: 30,
+        }
+    }
 }
 
 impl CameraFormat {
@@ -38,4 +72,195 @@ impl CameraFormat {
             frame_rate,
         }
     }
+
+    pub fn width(&self) -> u32 {
+        self.resolution.width_x
+    }
+
+    pub fn height(&self) -> u32 {
+        self.resolution.height_y
+    }
+
+    pub fn resolution(&self) -> Resolution {
+        self.resolution
+    }
+
+    pub fn frame_rate(&self) -> u32 {
+        self.frame_rate
+    }
+
+    pub fn format(&self) -> FrameFormat {
+        self.format
+    }
+}
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd)]
+pub struct CameraInfo {
+    human_name: String,
+    description: String,
+    misc: String,
+    index: usize,
+}
+
+impl CameraInfo {
+    pub fn new(human_name: &str, description: &str, misc: &str, index: usize) -> Self {
+        CameraInfo {
+            human_name: human_name.to_string(),
+            description: description.to_string(),
+            misc: misc.to_string(),
+            index,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
+pub enum CameraIndex {
+    Index(u32),
+    String(String),
+}
+
+pub fn mjpeg_to_rgb24(in_buf: &[u8]) -> Result<Vec<u8>, BevyGstError> {
+    let mut decoder = jpeg_decoder::Decoder::new(in_buf);
+
+    let d = match decoder.decode() {
+        Ok(d) => d,
+        Err(err) => {
+            return Err(BevyGstError::ProcessFrameError {
+                src: FrameFormat::MJPEG,
+                destination: "RGB888".to_string(),
+                error: format!("Could not decode MJPEG: {}", err),
+            });
+        }
+    };
+
+    Ok(d)
+}
+pub fn yuyv422_to_rgb(data: &[u8], rgba: bool) -> Result<Vec<u8>, BevyGstError> {
+    if data.len() % 4 != 0 {
+        return Err(BevyGstError::ProcessFrameError {
+            src: FrameFormat::YUYV,
+            destination: "RGB888".to_string(),
+            error: "Assertion failure, the YUV stream isn't 4:2:2! (wrong number of bytes)"
+                .to_string(),
+        });
+    }
+
+    let pixel_size = if rgba { 4 } else { 3 };
+    // yuyv yields 2 3-byte pixels per yuyv chunk
+    let rgb_buf_size = (data.len() / 4) * (2 * pixel_size);
+
+    let mut dest = vec![0; rgb_buf_size];
+    buf_yuyv422_to_rgb(data, &mut dest, rgba)?;
+
+    Ok(dest)
+}
+
+/// Same as [`yuyv422_to_rgb`] but with a destination buffer instead of a return `Vec<u8>`
+/// # Errors
+/// If the stream is invalid YUYV, or the destination buffer is not large enough, this will error.
+pub fn buf_yuyv422_to_rgb(data: &[u8], dest: &mut [u8], rgba: bool) -> Result<(), BevyGstError> {
+    if data.len() % 4 != 0 {
+        return Err(BevyGstError::ProcessFrameError {
+            src: FrameFormat::YUYV,
+            destination: "RGB888".to_string(),
+            error: "Assertion failure, the YUV stream isn't 4:2:2! (wrong number of bytes)"
+                .to_string(),
+        });
+    }
+
+    let pixel_size = if rgba { 4 } else { 3 };
+    // yuyv yields 2 3-byte pixels per yuyv chunk
+    let rgb_buf_size = (data.len() / 4) * (2 * pixel_size);
+
+    if dest.len() != rgb_buf_size {
+        return Err(BevyGstError::ProcessFrameError {
+            src: FrameFormat::YUYV,
+            destination: "RGB888".to_string(),
+            error: format!("Assertion failure, the destination RGB buffer is of the wrong size! [expected: {rgb_buf_size}, actual: {}]", dest.len()),
+        });
+    }
+
+    let iter = data.chunks_exact(4);
+
+    if rgba {
+        let mut iter = iter
+            .flat_map(|yuyv| {
+                let y1 = i32::from(yuyv[0]);
+                let u = i32::from(yuyv[1]);
+                let y2 = i32::from(yuyv[2]);
+                let v = i32::from(yuyv[3]);
+                let pixel1 = yuyv444_to_rgba(y1, u, v);
+                let pixel2 = yuyv444_to_rgba(y2, u, v);
+                [pixel1, pixel2]
+            })
+            .flatten();
+        for i in dest.iter_mut().take(rgb_buf_size) {
+            *i = match iter.next() {
+                Some(v) => v,
+                None => {
+                    return Err(BevyGstError::ProcessFrameError {
+                        src: FrameFormat::YUYV,
+                        destination: "RGBA8888".to_string(),
+                        error: "Ran out of RGBA YUYV values! (this should not happen, please file an issue: l1npengtul/nokhwa)".to_string()
+                    })
+                }
+            }
+        }
+    } else {
+        let mut iter = iter
+            .flat_map(|yuyv| {
+                let y1 = i32::from(yuyv[0]);
+                let u = i32::from(yuyv[1]);
+                let y2 = i32::from(yuyv[2]);
+                let v = i32::from(yuyv[3]);
+                let pixel1 = yuyv444_to_rgb(y1, u, v);
+                let pixel2 = yuyv444_to_rgb(y2, u, v);
+                [pixel1, pixel2]
+            })
+            .flatten();
+
+        for i in dest.iter_mut().take(rgb_buf_size) {
+            *i = match iter.next() {
+                Some(v) => v,
+                None => {
+                    return Err(BevyGstError::ProcessFrameError {
+                        src: FrameFormat::YUYV,
+                        destination: "RGB888".to_string(),
+                        error: "Ran out of RGB YUYV values! (this should not happen, please file an issue: l1npengtul/nokhwa)".to_string()
+                    })
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+// equation from https://en.wikipedia.org/wiki/YUV#Converting_between_Y%E2%80%B2UV_and_RGB
+/// Convert `YCbCr` 4:4:4 to a RGB888. [For further reading](https://en.wikipedia.org/wiki/YUV#Converting_between_Y%E2%80%B2UV_and_RGB)
+#[allow(clippy::many_single_char_names)]
+#[allow(clippy::cast_possible_truncation)]
+#[allow(clippy::cast_sign_loss)]
+#[must_use]
+#[inline]
+pub fn yuyv444_to_rgb(y: i32, u: i32, v: i32) -> [u8; 3] {
+    let c298 = (y - 16) * 298;
+    let d = u - 128;
+    let e = v - 128;
+    let r = ((c298 + 409 * e + 128) >> 8) as u8;
+    let g = ((c298 - 100 * d - 208 * e + 128) >> 8) as u8;
+    let b = ((c298 + 516 * d + 128) >> 8) as u8;
+    [r, g, b]
+}
+
+// equation from https://en.wikipedia.org/wiki/YUV#Converting_between_Y%E2%80%B2UV_and_RGB
+/// Convert `YCbCr` 4:4:4 to a RGBA8888. [For further reading](https://en.wikipedia.org/wiki/YUV#Converting_between_Y%E2%80%B2UV_and_RGB)
+///
+/// Equivalent to [`yuyv444_to_rgb`] but with an alpha channel attached.
+#[allow(clippy::many_single_char_names)]
+#[must_use]
+#[inline]
+pub fn yuyv444_to_rgba(y: i32, u: i32, v: i32) -> [u8; 4] {
+    let [r, g, b] = yuyv444_to_rgb(y, u, v);
+    [r, g, b, 255]
 }

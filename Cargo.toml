@@ -5,12 +5,19 @@ version = "0.1.0"
 edition = "2021"
 
 
-
+[lib]
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-gstreamer = "0.20.5"
 bevy = { version = "0.10.0", default-features = false }
-
+thiserror = "1.0"
+gstreamer = "0.20"
+gstreamer-app = "0.20"
+gstreamer-video = "0.20"
+glib = "0.17"
+crossbeam = "0.8"
+image = { version = "0.24", features = ["jpeg"]}
+jpeg-decoder = "0.3.0"
 
 [dev-dependencies]
 bevy = { version = "0.10.0", features = []}
