@@ -1,3 +1,8 @@
+# `bevy_gstreamer`
+
+This crate provide a gstreamer pipeline to render webcamera to bevy render background.
+
+--------
 # Install dependency
 ## Linux/BSDs
 ```bash
