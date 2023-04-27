@@ -486,6 +486,9 @@ fn webcam_pipeline(device: &str, camera_format: CameraFormat) -> String {
         FrameFormat::YUYV => {
             format!("autovideosrc location=/dev/video{} ! video/x-raw,format=YUY2,width={},height={},framerate={}/1 ! appsink name=appsink async=false sync=false", device, camera_format.width(), camera_format.height(), camera_format.frame_rate())
         }
+        FrameFormat::GRAY => {
+            format!("autovideosrc location=/dev/video{} ! video/x-raw,format=GRAY8,width={},height={},framerate={}/1 ! appsink name=appsink async=false sync=false", device, camera_format.width(), camera_format.height(), camera_format.frame_rate())
+        }
         _ => {
             format!("unsupproted! if you see this, switch to something else!")
         }
@@ -501,6 +504,9 @@ fn webcam_pipeline(device: &str, camera_format: CameraFormat) -> String {
         FrameFormat::YUYV => {
             format!("v4l2src device=/dev/video{} ! video/x-raw,format=YUY2,width={},height={},framerate={}/1 ! appsink name=appsink async=false sync=false", device, camera_format.width(), camera_format.height(), camera_format.frame_rate())
         }
+        FrameFormat::GRAY => {
+            format!("v4l2src device=/dev/video{} ! video/x-raw,format=GRAY8,width={},height={},framerate={}/1 ! appsink name=appsink async=false sync=false", device, camera_format.width(), camera_format.height(), camera_format.frame_rate())
+        }
         _ => {
             format!("unsupproted! if you see this, switch to something else!")
         }
@@ -515,6 +521,9 @@ fn webcam_pipeline(device: &str, camera_format: CameraFormat) -> String {
         }
         FrameFormat::YUYV => {
             format!("ksvideosrc device_index={} ! video/x-raw,format=YUY2,width={},height={},framerate={}/1 ! appsink name=appsink async=false sync=false", device, camera_format.width(), camera_format.height(), camera_format.frame_rate())
+        }
+        FrameFormat::GRAY => {
+            format!("ksvideosrc device_index={} ! video/x-raw,format=GRAY8,width={},height={},framerate={}/1 ! appsink name=appsink async=false sync=false", device, camera_format.width(), camera_format.height(), camera_format.frame_rate())
         }
         _ => {
             format!("unsupproted! if you see this, switch to something else!")
