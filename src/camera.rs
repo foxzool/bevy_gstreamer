@@ -113,7 +113,7 @@ impl GstCamera {
         Ok(())
     }
 
-    fn is_stream_open(&self) -> bool {
+    pub fn is_stream_open(&self) -> bool {
         let (res, state_from, state_to) = self.pipeline.state(ClockTime::from_mseconds(16));
         if res.is_ok() {
             if state_to == State::Playing {
@@ -128,7 +128,7 @@ impl GstCamera {
         }
     }
 
-    fn frame(&mut self) -> Result<ImageBuffer<Rgb<u8>, Vec<u8>>, BevyGstError> {
+    pub fn frame(&mut self) -> Result<ImageBuffer<Rgb<u8>, Vec<u8>>, BevyGstError> {
         let cam_fmt = self.camera_format;
         let image_data = self.frame_raw()?;
         let imagebuf =
@@ -173,7 +173,7 @@ impl GstCamera {
         Ok(Cow::from(self.image_lock.lock().unwrap().to_vec()))
     }
 
-    fn stop_stream(&mut self) -> Result<(), BevyGstError> {
+    pub fn stop_stream(&mut self) -> Result<(), BevyGstError> {
         if let Err(why) = self.pipeline.set_state(State::Null) {
             return Err(BevyGstError::StreamShutdownError(format!(
                 "Could not change state: {}",

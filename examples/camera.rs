@@ -8,6 +8,7 @@ fn main() {
         .add_plugins(DefaultPlugins)
         .add_plugin(GstreamerPlugin)
         .add_startup_system(setup_camera)
+        .add_system(camera_control)
         .run()
 }
 
@@ -40,4 +41,23 @@ fn setup_camera(
         transform: Transform::from_xyz(0.0, 0.5, 0.0),
         ..default()
     });
+}
+
+fn camera_control(
+    keyboard_input: Res<Input<KeyCode>>,
+    mut q_camera: Query<&mut GstCamera, With<BackgroundImageMarker>>,
+) {
+    if keyboard_input.just_pressed(KeyCode::Key1) {
+        if let Ok(mut cam) = q_camera.get_single_mut() {
+            info!("start stream");
+            cam.open_stream().unwrap();
+        }
+    }
+
+    if keyboard_input.just_pressed(KeyCode::Key2) {
+        if let Ok(mut cam) = q_camera.get_single_mut() {
+            info!("stop stream");
+            cam.stop_stream().unwrap();
+        }
+    }
 }
