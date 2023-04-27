@@ -1,25 +1,69 @@
+use crate::camera::background::*;
 use crate::error::BevyGstError;
 use crate::types::yuyv422_to_rgb;
 use crate::types::{mjpeg_to_rgb24, CameraFormat, CameraInfo, FrameFormat};
+use bevy::core_pipeline;
 use bevy::prelude::*;
+use bevy::render::extract_resource::ExtractResourcePlugin;
+use bevy::render::render_graph::RenderGraph;
+use bevy::render::RenderApp;
 use gstreamer::{
     element_error,
     glib::Cast,
     prelude::{DeviceExt, DeviceMonitorExt, DeviceMonitorExtManual, ElementExt, GstBinExt},
-    Bin, Caps, DeviceMonitor, Element, FlowError, FlowSuccess, ResourceError, State,
+    Bin, Caps, ClockTime, DeviceMonitor, Element, FlowError, FlowSuccess, MessageView,
+    ResourceError, State,
 };
 use gstreamer_app::{AppSink, AppSinkCallbacks};
 use gstreamer_video::{VideoFormat, VideoInfo};
 use image::ImageBuffer;
-use image::Rgb;
+use image::{Rgb, RgbaImage};
+use std::borrow::Cow;
+use std::str::FromStr;
 use std::sync::{Arc, Mutex};
+
 type PipelineGenRet = (Element, AppSink, Arc<Mutex<ImageBuffer<Rgb<u8>, Vec<u8>>>>);
+
+mod background;
 
 pub struct WebCameraPlugin;
 
 impl Plugin for WebCameraPlugin {
-    fn build(&self, _app: &mut App) {}
+    fn build(&self, app: &mut App) {
+        app.insert_resource(BackgroundImage(RgbaImage::new(640, 480)))
+            .add_plugin(ExtractResourcePlugin::<BackgroundImage>::default())
+            .add_system(handle_background_image);
+
+        let render_app = app.sub_app_mut(RenderApp);
+        render_app.init_resource::<BackgroundPipeline>();
+        let background_node_2d = BackgroundNode::new(&mut render_app.world);
+        let background_node_3d = BackgroundNode::new(&mut render_app.world);
+        let mut render_graph = render_app.world.resource_mut::<RenderGraph>();
+
+        if let Some(graph_2d) = render_graph.get_sub_graph_mut(core_pipeline::core_2d::graph::NAME)
+        {
+            graph_2d.add_node(BACKGROUND_NODE, background_node_2d);
+
+            graph_2d.add_node_edge(
+                BACKGROUND_NODE,
+                core_pipeline::core_2d::graph::node::MAIN_PASS,
+            );
+        }
+
+        if let Some(graph_3d) = render_graph.get_sub_graph_mut(core_pipeline::core_3d::graph::NAME)
+        {
+            graph_3d.add_node(BACKGROUND_NODE, background_node_3d);
+
+            graph_3d.add_node_edge(
+                BACKGROUND_NODE,
+                core_pipeline::core_3d::graph::node::MAIN_PASS,
+            );
+        }
+    }
 }
+
+#[derive(Component)]
+pub struct BackgroundImageMarker;
 
 #[derive(Component)]
 pub struct GstCamera {
@@ -44,7 +88,7 @@ impl GstCamera {
             return Err(BevyGstError::InitializeError(why.to_string()));
         }
 
-        let (camera_info, caps) = search_device(0).unwrap();
+        let (camera_info, caps) = search_device(index).unwrap();
 
         let (pipeline, app_sink, receiver) = generate_pipeline(camera_format, index as usize)?;
 
@@ -68,10 +112,104 @@ impl GstCamera {
         }
         Ok(())
     }
+
+    fn is_stream_open(&self) -> bool {
+        let (res, state_from, state_to) = self.pipeline.state(ClockTime::from_mseconds(16));
+        if res.is_ok() {
+            if state_to == State::Playing {
+                return true;
+            }
+            false
+        } else {
+            if state_from == State::Playing {
+                return true;
+            }
+            false
+        }
+    }
+
+    fn frame(&mut self) -> Result<ImageBuffer<Rgb<u8>, Vec<u8>>, BevyGstError> {
+        let cam_fmt = self.camera_format;
+        let image_data = self.frame_raw()?;
+        let imagebuf =
+            match ImageBuffer::from_vec(cam_fmt.width(), cam_fmt.height(), image_data.to_vec()) {
+                Some(buf) => {
+                    let rgbbuf: ImageBuffer<Rgb<u8>, Vec<u8>> = buf;
+                    rgbbuf
+                }
+                None => return Err(BevyGstError::ReadFrameError(
+                    "Imagebuffer is not large enough! This is probably a bug, please report it!"
+                        .to_string(),
+                )),
+            };
+        Ok(imagebuf)
+    }
+
+    fn frame_raw(&mut self) -> Result<Cow<[u8]>, BevyGstError> {
+        let bus = match self.pipeline.bus() {
+            Some(bus) => bus,
+            None => {
+                return Err(BevyGstError::ReadFrameError(
+                    "The pipeline has no bus!".to_string(),
+                ))
+            }
+        };
+
+        if let Some(message) = bus.timed_pop(ClockTime::from_seconds(0)) {
+            match message.view() {
+                MessageView::Eos(..) => {
+                    return Err(BevyGstError::ReadFrameError("Stream is ended!".to_string()))
+                }
+                MessageView::Error(err) => {
+                    return Err(BevyGstError::ReadFrameError(format!(
+                        "Bus error: {}",
+                        err.error()
+                    )));
+                }
+                _ => {}
+            }
+        }
+
+        Ok(Cow::from(self.image_lock.lock().unwrap().to_vec()))
+    }
+
+    fn stop_stream(&mut self) -> Result<(), BevyGstError> {
+        if let Err(why) = self.pipeline.set_state(State::Null) {
+            return Err(BevyGstError::StreamShutdownError(format!(
+                "Could not change state: {}",
+                why
+            )));
+        }
+        Ok(())
+    }
 }
 
 fn search_device(index: usize) -> Result<(CameraInfo, Option<Caps>), BevyGstError> {
     let device_monitor = DeviceMonitor::new();
+
+    let video_caps = match Caps::from_str("video/x-raw") {
+        Ok(cap) => cap,
+        Err(why) => {
+            return Err(BevyGstError::GeneralError(format!(
+                "Failed to generate caps: {}",
+                why
+            )))
+        }
+    };
+
+    let _video_filter_id = match device_monitor.add_filter(Some("Video/Source"), Some(&video_caps))
+    {
+        Some(id) => id,
+        None => match device_monitor.add_filter(Some("Source/Video"), Some(&video_caps)) {
+            Some(id) => id,
+            None => {
+                return Err(BevyGstError::StructureError {
+                    structure: "Video Filter ID Source/Video".to_string(),
+                    error: "Null".to_string(),
+                })
+            }
+        },
+    };
 
     if let Err(why) = device_monitor.start() {
         return Err(BevyGstError::StructureError {
@@ -111,21 +249,21 @@ fn search_device(index: usize) -> Result<(CameraInfo, Option<Caps>), BevyGstErro
 #[allow(clippy::too_many_lines)]
 #[allow(clippy::let_and_return)]
 fn generate_pipeline(fmt: CameraFormat, index: usize) -> Result<PipelineGenRet, BevyGstError> {
-    let pipeline =
-        match gstreamer::parse_launch(webcam_pipeline(format!("{}", index).as_str(), fmt).as_str())
-        {
-            Ok(p) => p,
-            Err(why) => {
-                return Err(BevyGstError::OpenDeviceError(
-                    index.to_string(),
-                    format!(
-                        "Failed to open pipeline with args {}: {}",
-                        webcam_pipeline(format!("{}", index).as_str(), fmt),
-                        why
-                    ),
-                ))
-            }
-        };
+    let appsink_pipeline = webcam_pipeline(format!("{}", index).as_str(), fmt);
+
+    let pipeline = match gstreamer::parse_launch(&appsink_pipeline) {
+        Ok(p) => p,
+        Err(why) => {
+            return Err(BevyGstError::OpenDeviceError(
+                index.to_string(),
+                format!(
+                    "Failed to open pipeline with args {}: {}",
+                    webcam_pipeline(format!("{}", index).as_str(), fmt),
+                    why
+                ),
+            ))
+        }
+    };
 
     let sink = match pipeline
         .clone()
@@ -213,7 +351,7 @@ fn generate_pipeline(fmt: CameraFormat, index: usize) -> Result<PipelineGenRet, 
 
                 let image_buffer = match video_info.format() {
                     VideoFormat::Yuy2 => {
-                        let mut decoded_buffer = match yuyv422_to_rgb(&buffer_map, false) {
+                        let mut decoded_buffer = match yuyv422_to_rgb(&buffer_map, true) {
                             Ok(buf) => buf,
                             Err(why) => {
                                 element_error!(
@@ -321,7 +459,9 @@ fn generate_pipeline(fmt: CameraFormat, index: usize) -> Result<PipelineGenRet, 
                     }
                 };
 
-                *img_lck_clone.lock().unwrap() = image_buffer;
+                if let Ok(mut img) = img_lck_clone.lock() {
+                    *img = image_buffer;
+                }
 
                 Ok(FlowSuccess::Ok)
             })

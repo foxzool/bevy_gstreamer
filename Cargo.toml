@@ -9,7 +9,7 @@ edition = "2021"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-bevy = { version = "0.10.0", default-features = false }
+bevy = { version = "0.10.0", default-features = false, features = ["bevy_render", "bevy_core_pipeline","bevy_asset", "bevy_winit", "bevy_pbr", "x11",] }
 thiserror = "1.0"
 gstreamer = "0.20"
 gstreamer-app = "0.20"
@@ -18,9 +18,8 @@ glib = "0.17"
 crossbeam = "0.8"
 image = { version = "0.24", features = ["jpeg"]}
 jpeg-decoder = "0.3.0"
+bytemuck = { version = "1.13", features = [ "derive" ] }
 
-[dev-dependencies]
-bevy = { version = "0.10.0", features = []}
 
 
 [profile.dev]

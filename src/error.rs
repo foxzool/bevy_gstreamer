@@ -11,6 +11,8 @@ pub enum BevyGstError {
     StructureError { structure: String, error: String },
     #[error("Could not open device {0}: {1}")]
     OpenDeviceError(String, String),
+    #[error("Could not capture frame: {0}")]
+    ReadFrameError(String),
     #[error("Could not process frame {src} to {destination}: {error}")]
     ProcessFrameError {
         src: FrameFormat,
@@ -19,4 +21,6 @@ pub enum BevyGstError {
     },
     #[error("Could not open device stream: {0}")]
     OpenStreamError(String),
+    #[error("Could not stop device stream: {0}")]
+    StreamShutdownError(String),
 }
