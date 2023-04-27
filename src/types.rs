@@ -65,6 +65,7 @@ impl Default for CameraFormat {
 }
 
 impl CameraFormat {
+    /// create a new CameraFormat
     pub fn new(resolution: Resolution, format: FrameFormat, frame_rate: u32) -> Self {
         Self {
             resolution,
@@ -73,22 +74,39 @@ impl CameraFormat {
         }
     }
 
+    /// create a new CameraFormat from a resolution and a format
+    pub fn new_from(res_x: u32, res_y: u32, format: FrameFormat, fps: u32) -> Self {
+        CameraFormat {
+            resolution: Resolution {
+                width_x: res_x,
+                height_y: res_y,
+            },
+            format,
+            frame_rate: fps,
+        }
+    }
+
+    /// get camera resolution width
     pub fn width(&self) -> u32 {
         self.resolution.width_x
     }
 
+    /// get camera resolution height
     pub fn height(&self) -> u32 {
         self.resolution.height_y
     }
 
+    /// get camera resolution
     pub fn resolution(&self) -> Resolution {
         self.resolution
     }
 
+    /// get camera frame rate
     pub fn frame_rate(&self) -> u32 {
         self.frame_rate
     }
 
+    /// get camera frame format
     pub fn format(&self) -> FrameFormat {
         self.format
     }

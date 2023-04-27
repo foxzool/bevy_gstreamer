@@ -1,11 +1,20 @@
 use bevy::core_pipeline::clear_color::ClearColorConfig;
 use bevy::prelude::*;
 use bevy_gstreamer::camera::{BackgroundImageMarker, GstCamera};
+use bevy_gstreamer::types::{CameraFormat, FrameFormat};
 use bevy_gstreamer::GstreamerPlugin;
 
 fn main() {
     App::new()
-        .add_plugins(DefaultPlugins)
+        .add_plugins(DefaultPlugins.set(WindowPlugin {
+            primary_window: Some(Window {
+                title: "gstreamer capture".into(),
+                resolution: (640., 480.).into(),
+
+                ..default()
+            }),
+            ..default()
+        }))
         .add_plugin(GstreamerPlugin)
         .add_startup_system(setup_camera)
         .add_system(camera_control)
@@ -17,18 +26,22 @@ fn setup_camera(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    let mut camera = GstCamera::new(0, None).unwrap();
+    let mut camera = GstCamera::new(
+        0,
+        Some(CameraFormat::new_from(640, 480, FrameFormat::MJPEG, 30)),
+    )
+    .unwrap();
     camera.open_stream().unwrap();
-    commands
-        .spawn(Camera3dBundle {
-            camera_3d: Camera3d {
-                clear_color: ClearColorConfig::None,
-                ..default()
-            },
-            transform: Transform::from_xyz(-2.0, 2.5, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
-            ..Default::default()
-        })
-        .insert((camera, BackgroundImageMarker));
+    commands.spawn((camera, BackgroundImageMarker));
+
+    commands.spawn(Camera3dBundle {
+        camera_3d: Camera3d {
+            clear_color: ClearColorConfig::None,
+            ..default()
+        },
+        transform: Transform::from_xyz(-2.0, 2.5, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
+        ..Default::default()
+    });
 
     // cube
     commands.spawn(PbrBundle {
