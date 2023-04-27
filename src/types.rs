@@ -129,6 +129,10 @@ impl CameraInfo {
             index,
         }
     }
+
+    pub fn index(&self) -> usize {
+        self.index
+    }
 }
 
 #[derive(Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]

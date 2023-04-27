@@ -7,6 +7,7 @@ use bevy::prelude::*;
 use bevy::render::extract_resource::ExtractResourcePlugin;
 use bevy::render::render_graph::RenderGraph;
 use bevy::render::RenderApp;
+use gstreamer::prelude::ElementExtManual;
 use gstreamer::{
     element_error,
     glib::Cast,
@@ -117,18 +118,7 @@ impl GstCamera {
 
     /// check device stream is opening
     pub fn is_stream_open(&self) -> bool {
-        let (res, state_from, state_to) = self.pipeline.state(ClockTime::from_mseconds(16));
-        if res.is_ok() {
-            if state_to == State::Playing {
-                return true;
-            }
-            false
-        } else {
-            if state_from == State::Playing {
-                return true;
-            }
-            false
-        }
+        self.pipeline.current_state() == State::Playing
     }
 
     /// get rgb image from device
@@ -150,7 +140,7 @@ impl GstCamera {
     }
 
     /// raw data from device
-    fn frame_raw(&mut self) -> Result<Cow<[u8]>, BevyGstError> {
+    pub fn frame_raw(&mut self) -> Result<Cow<[u8]>, BevyGstError> {
         let bus = match self.pipeline.bus() {
             Some(bus) => bus,
             None => {
@@ -186,6 +176,42 @@ impl GstCamera {
                 why
             )));
         }
+        Ok(())
+    }
+
+    /// get camera index
+    pub fn index(&self) -> usize {
+        self.index
+    }
+
+    /// get camera infomation
+    pub fn camera_info(&self) -> &CameraInfo {
+        &self.camera_info
+    }
+
+    /// get camera format
+    pub fn camera_format(&self) -> CameraFormat {
+        self.camera_format
+    }
+
+    /// set camera a new format
+    pub fn set_camera_format(&mut self, new_fmt: CameraFormat) -> Result<(), BevyGstError> {
+        let mut reopen = false;
+        if self.is_stream_open() {
+            println!("is open");
+
+            self.stop_stream()?;
+            reopen = true;
+        }
+        let (pipeline, app_sink, receiver) = generate_pipeline(new_fmt, self.camera_info.index())?;
+        self.pipeline = pipeline;
+        self.app_sink = app_sink;
+        self.image_lock = receiver;
+        if reopen {
+            self.open_stream()?;
+        }
+
+        self.camera_format = new_fmt;
         Ok(())
     }
 }

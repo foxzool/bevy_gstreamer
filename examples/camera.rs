@@ -73,4 +73,20 @@ fn camera_control(
             cam.stop_stream().unwrap();
         }
     }
+
+    if keyboard_input.just_pressed(KeyCode::Key3) {
+        if let Ok(mut cam) = q_camera.get_single_mut() {
+            info!("change capture resolution to 1920x1080 30fps");
+            cam.set_camera_format(CameraFormat::new_from(1920, 1080, FrameFormat::MJPEG, 30))
+                .unwrap();
+        }
+    }
+
+    if keyboard_input.just_pressed(KeyCode::Key4) {
+        if let Ok(mut cam) = q_camera.get_single_mut() {
+            info!("change capture resolution to 640x480 30fps");
+            cam.set_camera_format(CameraFormat::new_from(640, 480, FrameFormat::MJPEG, 30))
+                .unwrap();
+        }
+    }
 }
