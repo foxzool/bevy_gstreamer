@@ -65,6 +65,7 @@ impl Plugin for WebCameraPlugin {
 #[derive(Component)]
 pub struct BackgroundImageMarker;
 
+/// A camera from gstreamer pipeline
 #[derive(Component)]
 pub struct GstCamera {
     /// camera index
@@ -103,6 +104,7 @@ impl GstCamera {
         })
     }
 
+    /// open capture stream
     pub fn open_stream(&mut self) -> Result<(), BevyGstError> {
         if let Err(why) = self.pipeline.set_state(State::Playing) {
             return Err(BevyGstError::OpenStreamError(format!(
@@ -113,6 +115,7 @@ impl GstCamera {
         Ok(())
     }
 
+    /// check device stream is opening
     pub fn is_stream_open(&self) -> bool {
         let (res, state_from, state_to) = self.pipeline.state(ClockTime::from_mseconds(16));
         if res.is_ok() {
@@ -128,14 +131,15 @@ impl GstCamera {
         }
     }
 
+    /// get rgb image from device
     pub fn frame(&mut self) -> Result<ImageBuffer<Rgb<u8>, Vec<u8>>, BevyGstError> {
         let cam_fmt = self.camera_format;
         let image_data = self.frame_raw()?;
         let imagebuf =
             match ImageBuffer::from_vec(cam_fmt.width(), cam_fmt.height(), image_data.to_vec()) {
                 Some(buf) => {
-                    let rgbbuf: ImageBuffer<Rgb<u8>, Vec<u8>> = buf;
-                    rgbbuf
+                    let rgb: ImageBuffer<Rgb<u8>, Vec<u8>> = buf;
+                    rgb
                 }
                 None => return Err(BevyGstError::ReadFrameError(
                     "Imagebuffer is not large enough! This is probably a bug, please report it!"
@@ -145,6 +149,7 @@ impl GstCamera {
         Ok(imagebuf)
     }
 
+    /// raw data from device
     fn frame_raw(&mut self) -> Result<Cow<[u8]>, BevyGstError> {
         let bus = match self.pipeline.bus() {
             Some(bus) => bus,
@@ -173,6 +178,7 @@ impl GstCamera {
         Ok(Cow::from(self.image_lock.lock().unwrap().to_vec()))
     }
 
+    /// stop device stream
     pub fn stop_stream(&mut self) -> Result<(), BevyGstError> {
         if let Err(why) = self.pipeline.set_state(State::Null) {
             return Err(BevyGstError::StreamShutdownError(format!(
@@ -184,6 +190,7 @@ impl GstCamera {
     }
 }
 
+/// search device by index
 fn search_device(index: usize) -> Result<(CameraInfo, Option<Caps>), BevyGstError> {
     let device_monitor = DeviceMonitor::new();
 
@@ -316,7 +323,7 @@ fn generate_pipeline(fmt: CameraFormat, index: usize) -> Result<PipelineGenRet, 
                         element_error!(
                             appsink,
                             ResourceError::Failed,
-                            (format!("Failed to get videoinfo from caps: {}", why).as_str())
+                            (format!("Failed to get video info from caps: {}", why).as_str())
                         );
 
                         return Err(FlowError::Error);

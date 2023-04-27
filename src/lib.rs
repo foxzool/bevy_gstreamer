@@ -1,5 +1,3 @@
-#![feature(portable_simd)]
-
 use bevy::app::{App, Plugin};
 
 pub mod camera;

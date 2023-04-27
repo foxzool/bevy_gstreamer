@@ -3,7 +3,11 @@ name = "bevy_gstreamer"
 authors = ["FoxZoOL <zhooul@gmail.com>"]
 version = "0.1.0"
 edition = "2021"
-
+description = "GStreamer plugin for Bevy"
+keywords = ["camera", "webcam", "capture", "cross-platform", "gstreamer"]
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/foxzool/bevy_gstreamer"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
@@ -20,6 +24,10 @@ image = { version = "0.24", features = ["jpeg"] }
 jpeg-decoder = "0.3.0"
 bytemuck = { version = "1.13", features = ["derive"] }
 
+
+[[example]]
+name = "camera"
+path = "examples/camera.rs"
 
 [dev-dependencies]
 bevy = { version = "0.10" }
