@@ -23,4 +23,8 @@ pub enum BevyGstError {
     OpenStreamError(String),
     #[error("Could not stop device stream: {0}")]
     StreamShutdownError(String),
+    #[error("Could not get device property {property}: {error}")]
+    GetPropertyError { property: String, error: String },
+    #[error("This operation is not implemented yet: {0}")]
+    NotImplementedError(String),
 }

@@ -23,7 +23,7 @@ crossbeam = "0.8"
 image = { version = "0.24", features = ["jpeg"] }
 jpeg-decoder = "0.3.0"
 bytemuck = { version = "1.13", features = ["derive"] }
-
+regex = "1.7"
 
 [[example]]
 name = "camera"

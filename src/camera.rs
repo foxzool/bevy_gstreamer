@@ -1,12 +1,13 @@
 use crate::camera::background::*;
 use crate::error::BevyGstError;
-use crate::types::yuyv422_to_rgb;
 use crate::types::{mjpeg_to_rgb24, CameraFormat, CameraInfo, FrameFormat};
+use crate::types::{yuyv422_to_rgb, Resolution};
 use bevy::core_pipeline;
 use bevy::prelude::*;
 use bevy::render::extract_resource::ExtractResourcePlugin;
 use bevy::render::render_graph::RenderGraph;
 use bevy::render::RenderApp;
+use glib::Quark;
 use gstreamer::prelude::ElementExtManual;
 use gstreamer::{
     element_error,
@@ -19,7 +20,9 @@ use gstreamer_app::{AppSink, AppSinkCallbacks};
 use gstreamer_video::{VideoFormat, VideoInfo};
 use image::ImageBuffer;
 use image::{Rgb, RgbaImage};
+use regex::Regex;
 use std::borrow::Cow;
+use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 
@@ -68,8 +71,8 @@ pub struct BackgroundImageMarker;
 
 /// A camera from gstreamer pipeline
 #[derive(Component)]
+#[allow(dead_code)]
 pub struct GstCamera {
-    /// camera index
     index: usize,
     pipeline: Element,
     app_sink: AppSink,
@@ -213,6 +216,212 @@ impl GstCamera {
 
         self.camera_format = new_fmt;
         Ok(())
+    }
+
+    #[allow(clippy::too_many_lines)]
+    #[allow(clippy::cast_sign_loss)]
+    #[allow(dead_code)]
+    fn compatible_list_by_resolution(
+        &mut self,
+        fourcc: FrameFormat,
+    ) -> Result<HashMap<Resolution, Vec<u32>>, BevyGstError> {
+        let mut resolution_map = HashMap::new();
+
+        let frame_regex = Regex::new(r"(\d+/1)|((\d+/\d)+(\d/1)*)").unwrap();
+
+        match self.caps.clone() {
+            Some(c) => {
+                for capability in c.iter() {
+                    match fourcc {
+                        FrameFormat::MJPEG => {
+                            if capability.name() == "image/jpeg" {
+                                let mut fps_vec = vec![];
+
+                                let width = match capability.get::<i32>("width") {
+                                    Ok(w) => w,
+                                    Err(why) => {
+                                        return Err(BevyGstError::GetPropertyError {
+                                            property: "Capibilities by Resolution: Width"
+                                                .to_string(),
+                                            error: why.to_string(),
+                                        })
+                                    }
+                                };
+                                let height = match capability.get::<i32>("height") {
+                                    Ok(w) => w,
+                                    Err(why) => {
+                                        return Err(BevyGstError::GetPropertyError {
+                                            property: "Capibilities by Resolution: Height"
+                                                .to_string(),
+                                            error: why.to_string(),
+                                        })
+                                    }
+                                };
+                                let value =
+                                    match capability.value_by_quark(Quark::from_str("framerate")) {
+                                        Ok(v) => match v.transform::<String>() {
+                                            Ok(s) => {
+                                                format!("{:?}", s)
+                                            }
+                                            Err(why) => {
+                                                return Err(BevyGstError::GetPropertyError {
+                                                    property: "Framerates".to_string(),
+                                                    error: format!(
+                                                        "Failed to make framerates into string: {}",
+                                                        why
+                                                    ),
+                                                });
+                                            }
+                                        },
+                                        Err(_) => {
+                                            return Err(BevyGstError::GetPropertyError {
+                                                property: "Framerates".to_string(),
+                                                error: "Failed to get framerates: doesnt exist!"
+                                                    .to_string(),
+                                            })
+                                        }
+                                    };
+
+                                for m in frame_regex.find_iter(&value) {
+                                    let fraction_string: Vec<&str> =
+                                        m.as_str().split('/').collect();
+                                    if fraction_string.len() != 2 {
+                                        return Err(BevyGstError::GetPropertyError { property: "Framerates".to_string(), error: format!("Fraction framerate had more than one demoninator: {:?}", fraction_string) });
+                                    }
+
+                                    if let Some(v) = fraction_string.get(1) {
+                                        if *v != "1" {
+                                            continue; // swallow error
+                                        }
+                                    } else {
+                                        return Err(BevyGstError::GetPropertyError { property: "Framerates".to_string(), error: "No framerate denominator? Shouldn't happen, please report!".to_string() });
+                                    }
+
+                                    if let Some(numerator) = fraction_string.get(0) {
+                                        match numerator.parse::<u32>() {
+                                            Ok(fps) => fps_vec.push(fps),
+                                            Err(why) => {
+                                                return Err(BevyGstError::GetPropertyError {
+                                                    property: "Framerates".to_string(),
+                                                    error: format!(
+                                                        "Failed to parse numerator: {}",
+                                                        why
+                                                    ),
+                                                });
+                                            }
+                                        }
+                                    } else {
+                                        return Err(BevyGstError::GetPropertyError { property: "Framerates".to_string(), error: "No framerate numerator? Shouldn't happen, please report!".to_string() });
+                                    }
+                                }
+                                resolution_map
+                                    .insert(Resolution::new(width as u32, height as u32), fps_vec);
+                            }
+                        }
+                        FrameFormat::YUYV => {
+                            if capability.name() == "video/x-raw"
+                                && capability.get::<String>("format").unwrap_or_default() == *"YUY2"
+                            {
+                                let mut fps_vec = vec![];
+
+                                let width = match capability.get::<i32>("width") {
+                                    Ok(w) => w,
+                                    Err(why) => {
+                                        return Err(BevyGstError::GetPropertyError {
+                                            property: "Capibilities by Resolution: Width"
+                                                .to_string(),
+                                            error: why.to_string(),
+                                        })
+                                    }
+                                };
+                                let height = match capability.get::<i32>("height") {
+                                    Ok(w) => w,
+                                    Err(why) => {
+                                        return Err(BevyGstError::GetPropertyError {
+                                            property: "Capibilities by Resolution: Height"
+                                                .to_string(),
+                                            error: why.to_string(),
+                                        })
+                                    }
+                                };
+                                let value =
+                                    match capability.value_by_quark(Quark::from_str("framerate")) {
+                                        Ok(v) => match v.transform::<String>() {
+                                            Ok(s) => {
+                                                format!("{:?}", s)
+                                            }
+                                            Err(why) => {
+                                                return Err(BevyGstError::GetPropertyError {
+                                                    property: "Framerates".to_string(),
+                                                    error: format!(
+                                                        "Failed to make framerates into string: {}",
+                                                        why
+                                                    ),
+                                                });
+                                            }
+                                        },
+                                        Err(_) => {
+                                            return Err(BevyGstError::GetPropertyError {
+                                                property: "Framerates".to_string(),
+                                                error: "Failed to get framerates: doesnt exist!"
+                                                    .to_string(),
+                                            })
+                                        }
+                                    };
+
+                                for m in frame_regex.find_iter(&value) {
+                                    let fraction_string: Vec<&str> =
+                                        m.as_str().split('/').collect();
+                                    if fraction_string.len() != 2 {
+                                        return Err(BevyGstError::GetPropertyError { property: "Framerates".to_string(), error: format!("Fraction framerate had more than one demoninator: {:?}", fraction_string) });
+                                    }
+
+                                    if let Some(v) = fraction_string.get(1) {
+                                        if *v != "1" {
+                                            continue; // swallow error
+                                        }
+                                    } else {
+                                        return Err(BevyGstError::GetPropertyError { property: "Framerates".to_string(), error: "No framerate denominator? Shouldn't happen, please report!".to_string() });
+                                    }
+
+                                    if let Some(numerator) = fraction_string.get(0) {
+                                        match numerator.parse::<u32>() {
+                                            Ok(fps) => fps_vec.push(fps),
+                                            Err(why) => {
+                                                return Err(BevyGstError::GetPropertyError {
+                                                    property: "Framerates".to_string(),
+                                                    error: format!(
+                                                        "Failed to parse numerator: {}",
+                                                        why
+                                                    ),
+                                                });
+                                            }
+                                        }
+                                    } else {
+                                        return Err(BevyGstError::GetPropertyError { property: "Framerates".to_string(), error: "No framerate numerator? Shouldn't happen, please report!".to_string() });
+                                    }
+                                }
+                                resolution_map
+                                    .insert(Resolution::new(width as u32, height as u32), fps_vec);
+                            }
+                        }
+                        unsupported => {
+                            return Err(BevyGstError::NotImplementedError(format!(
+                                "Not supported frame format {unsupported:?}"
+                            )))
+                        }
+                    }
+                }
+            }
+            None => {
+                return Err(BevyGstError::GetPropertyError {
+                    property: "Device Caps".to_string(),
+                    error: "No device caps!".to_string(),
+                })
+            }
+        }
+
+        Ok(resolution_map)
     }
 }
 
