@@ -30,7 +30,8 @@ fn setup_camera(
         0,
         Some(CameraFormat::new_from(640, 480, FrameFormat::MJPEG, 30)),
     )
-    .unwrap();
+    .expect("cannot find any camera");
+
     camera.open_stream().unwrap();
     commands.spawn((camera, BackgroundImageMarker));
 

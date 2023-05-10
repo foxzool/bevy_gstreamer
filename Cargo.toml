@@ -1,7 +1,7 @@
 [package]
 name = "bevy_gstreamer"
 authors = ["FoxZoOL <zhooul@gmail.com>"]
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "GStreamer plugin for Bevy"
 keywords = ["camera", "webcam", "capture", "cross-platform", "gstreamer"]

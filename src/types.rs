@@ -1,5 +1,6 @@
 use crate::error::BevyGstError;
 use std::fmt::{Display, Formatter};
+use std::str::FromStr;
 
 #[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
 pub struct Resolution {
@@ -43,6 +44,24 @@ impl Display for FrameFormat {
             FrameFormat::NV12 => {
                 write!(f, "NV12")
             }
+        }
+    }
+}
+
+impl FromStr for FrameFormat {
+    type Err = BevyGstError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "MJPEG" => Ok(FrameFormat::MJPEG),
+            "YUYV" => Ok(FrameFormat::YUYV),
+            "GRAY" => Ok(FrameFormat::GRAY),
+            "RAWRGB" => Ok(FrameFormat::RAWRGB),
+            "NV12" => Ok(FrameFormat::NV12),
+            _ => Err(BevyGstError::StructureError {
+                structure: "FrameFormat".to_string(),
+                error: format!("No match for {s}"),
+            }),
         }
     }
 }

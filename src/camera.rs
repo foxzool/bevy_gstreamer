@@ -93,7 +93,7 @@ impl GstCamera {
             return Err(BevyGstError::InitializeError(why.to_string()));
         }
 
-        let (camera_info, caps) = search_device(index).unwrap();
+        let (camera_info, caps) = search_device(index)?;
 
         let (pipeline, app_sink, receiver) = generate_pipeline(camera_format, index as usize)?;
 
@@ -227,7 +227,10 @@ impl GstCamera {
     ) -> Result<HashMap<Resolution, Vec<u32>>, BevyGstError> {
         let mut resolution_map = HashMap::new();
 
-        let frame_regex = Regex::new(r"(\d+/1)|((\d+/\d)+(\d/1)*)").unwrap();
+        let frame_regex = match Regex::new(r"(\d+/1)|((\d+/\d)+(\d/1)*)") {
+            Ok(r) => r,
+            Err(_why) => return Err(BevyGstError::GeneralError("Regex error".to_string())),
+        };
 
         match self.caps.clone() {
             Some(c) => {
