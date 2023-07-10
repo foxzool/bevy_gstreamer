@@ -15,9 +15,9 @@ fn main() {
             }),
             ..default()
         }))
-        .add_plugin(GstreamerPlugin)
-        .add_startup_system(setup_camera)
-        .add_system(camera_control)
+        .add_plugins(GstreamerPlugin)
+        .add_systems(Startup, setup_camera)
+        .add_systems(Update, camera_control)
         .run()
 }
 

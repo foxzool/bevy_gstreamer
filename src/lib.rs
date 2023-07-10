@@ -8,6 +8,6 @@ pub struct GstreamerPlugin;
 
 impl Plugin for GstreamerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugin(camera::WebCameraPlugin);
+        app.add_plugins(camera::WebCameraPlugin);
     }
 }

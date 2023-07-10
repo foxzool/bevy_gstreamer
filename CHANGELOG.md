@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.0] - 2023-07-10
+
+### Changed
+
+- bump bevy version to `0.11.*`
+
 ## [0.1.1] - 2023-05-10
 
 ### Fixed

@@ -35,11 +35,10 @@ pub struct WebCameraPlugin;
 impl Plugin for WebCameraPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(BackgroundImage(RgbaImage::new(640, 480)))
-            .add_plugin(ExtractResourcePlugin::<BackgroundImage>::default())
-            .add_system(handle_background_image);
+            .add_plugins(ExtractResourcePlugin::<BackgroundImage>::default())
+            .add_systems(Update, handle_background_image);
 
         let render_app = app.sub_app_mut(RenderApp);
-        render_app.init_resource::<BackgroundPipeline>();
         let background_node_2d = BackgroundNode::new(&mut render_app.world);
         let background_node_3d = BackgroundNode::new(&mut render_app.world);
         let mut render_graph = render_app.world.resource_mut::<RenderGraph>();
@@ -60,9 +59,14 @@ impl Plugin for WebCameraPlugin {
 
             graph_3d.add_node_edge(
                 BACKGROUND_NODE,
-                core_pipeline::core_3d::graph::node::MAIN_PASS,
+                core_pipeline::core_3d::graph::node::MAIN_TRANSPARENT_PASS,
             );
         }
+    }
+
+    fn finish(&self, app: &mut App) {
+        let render_app = app.sub_app_mut(RenderApp);
+        render_app.init_resource::<BackgroundPipeline>();
     }
 }
 
@@ -95,7 +99,7 @@ impl GstCamera {
 
         let (camera_info, caps) = search_device(index)?;
 
-        let (pipeline, app_sink, receiver) = generate_pipeline(camera_format, index as usize)?;
+        let (pipeline, app_sink, receiver) = generate_pipeline(camera_format, index)?;
 
         Ok(Self {
             index,
@@ -300,7 +304,7 @@ impl GstCamera {
                                         return Err(BevyGstError::GetPropertyError { property: "Framerates".to_string(), error: "No framerate denominator? Shouldn't happen, please report!".to_string() });
                                     }
 
-                                    if let Some(numerator) = fraction_string.get(0) {
+                                    if let Some(numerator) = fraction_string.first() {
                                         match numerator.parse::<u32>() {
                                             Ok(fps) => fps_vec.push(fps),
                                             Err(why) => {
@@ -387,7 +391,7 @@ impl GstCamera {
                                         return Err(BevyGstError::GetPropertyError { property: "Framerates".to_string(), error: "No framerate denominator? Shouldn't happen, please report!".to_string() });
                                     }
 
-                                    if let Some(numerator) = fraction_string.get(0) {
+                                    if let Some(numerator) = fraction_string.first() {
                                         match numerator.parse::<u32>() {
                                             Ok(fps) => fps_vec.push(fps),
                                             Err(why) => {
@@ -484,7 +488,7 @@ fn search_device(index: usize) -> Result<(CameraInfo, Option<Caps>), BevyGstErro
         CameraInfo::new(
             &DeviceExt::display_name(&device),
             &DeviceExt::device_class(&device),
-            &"",
+            "",
             index,
         ),
         caps,
@@ -763,8 +767,6 @@ fn webcam_pipeline(device: &str, camera_format: CameraFormat) -> String {
         FrameFormat::GRAY => {
             format!("ksvideosrc device_index={} ! video/x-raw,format=GRAY8,width={},height={},framerate={}/1 ! appsink name=appsink async=false sync=false", device, camera_format.width(), camera_format.height(), camera_format.frame_rate())
         }
-        _ => {
-            format!("unsupproted! if you see this, switch to something else!")
-        }
+        _ => "unsupproted! if you see this, switch to something else!".to_string(),
     }
 }

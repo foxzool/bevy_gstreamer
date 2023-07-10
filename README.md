@@ -29,9 +29,10 @@ $ brew install gstreamer gst-plugins-base gst-plugins-good \
 # Support
 [![Bevy tracking](https://img.shields.io/badge/Bevy%20tracking-released%20version-lightblue)](https://github.com/bevyengine/bevy/blob/main/docs/plugins_guidelines.md#main-branch-tracking)
 
-|bevy| bevy_gstreamer |
-|--|----------------|
-|0.10| 0.1.X          |
+| bevy | bevy_gstreamer |
+|------|----------------|
+| 0.11 | 0.2.X          |
+| 0.10 | 0.1.X          |
 
 # Licensing
 The project is under dual license MIT and Apache 2.0, so joink to your hearts content, just remember the license agreements.
