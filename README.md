@@ -31,11 +31,12 @@ $ brew install gstreamer gst-plugins-base gst-plugins-good \
 
 | bevy | bevy_gstreamer |
 |------|----------------|
+| 0.12 | 0.3.X          |
 | 0.11 | 0.2.X          |
 | 0.10 | 0.1.X          |
 
 # Licensing
-The project is under dual license MIT and Apache 2.0, so joink to your hearts content, just remember the license agreements.
+The project is under dual license MIT and Apache 2.0, so join to your hearts content, just remember the license agreements.
 
 # Contributing
 Yes this project is still very much WIP, so PRs are very welcome
