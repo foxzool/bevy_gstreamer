@@ -565,7 +565,10 @@ fn generate_pipeline(fmt: CameraFormat, index: usize) -> Result<PipelineGenRet, 
                         element_error!(
                             appsink,
                             ResourceError::Failed,
-                            (format!("Failed to get video info from caps: {}", why).as_str())
+                            (
+                                "{}",
+                                format!("Failed to get video info from caps: {}", why).as_str()
+                            )
                         );
 
                         return Err(FlowError::Error);
@@ -589,7 +592,10 @@ fn generate_pipeline(fmt: CameraFormat, index: usize) -> Result<PipelineGenRet, 
                         element_error!(
                             appsink,
                             ResourceError::Failed,
-                            (format!("Failed to map buffer to readablemap: {}", why).as_str())
+                            (
+                                "{}",
+                                format!("Failed to map buffer to readablemap: {}", why).as_str()
+                            )
                         );
 
                         return Err(FlowError::Error);
@@ -606,7 +612,11 @@ fn generate_pipeline(fmt: CameraFormat, index: usize) -> Result<PipelineGenRet, 
                                 element_error!(
                                     appsink,
                                     ResourceError::Failed,
-                                    (format!("Failed to make yuy2 into rgb888: {}", why).as_str())
+                                    (
+                                        "{}",
+                                        format!("Failed to make yuy2 into rgb888: {}", why)
+                                            .as_str()
+                                    )
                                 );
 
                                 return Err(FlowError::Error);
@@ -668,7 +678,11 @@ fn generate_pipeline(fmt: CameraFormat, index: usize) -> Result<PipelineGenRet, 
                                 element_error!(
                                     appsink,
                                     ResourceError::Failed,
-                                    (format!("Failed to make yuy2 into rgb888: {}", why).as_str())
+                                    (
+                                        "{}",
+                                        format!("Failed to make yuy2 into rgb888: {}", why)
+                                            .as_str()
+                                    )
                                 );
 
                                 return Err(FlowError::Error);

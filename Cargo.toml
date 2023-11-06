@@ -1,7 +1,7 @@
 [package]
 name = "bevy_gstreamer"
 authors = ["FoxZoOL <zhooul@gmail.com>"]
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 description = "GStreamer plugin for Bevy"
 keywords = ["camera", "webcam", "capture", "cross-platform", "gstreamer"]
@@ -13,12 +13,12 @@ repository = "https://github.com/foxzool/bevy_gstreamer"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-bevy = { version = "0.11", default-features = false, features = ["bevy_render", "bevy_core_pipeline", "bevy_asset", "bevy_winit", "bevy_pbr", "x11"] }
+bevy = { version = "0.12", default-features = false, features = ["bevy_render", "bevy_core_pipeline", "bevy_asset", "bevy_winit", "bevy_pbr", "x11"] }
 thiserror = "1.0"
-gstreamer = "0.20"
-gstreamer-app = "0.20"
-gstreamer-video = "0.20"
-glib = "0.17"
+gstreamer = "0.21"
+gstreamer-app = "0.21"
+gstreamer-video = "0.21"
+glib = "0.18"
 crossbeam = "0.8"
 image = { version = "0.24", features = ["jpeg"] }
 jpeg-decoder = "0.3.0"
@@ -30,7 +30,7 @@ name = "camera"
 path = "examples/camera.rs"
 
 [dev-dependencies]
-bevy = { version = "0.11" }
+bevy = { version = "0.12" }
 
 [profile.dev]
 opt-level = 1

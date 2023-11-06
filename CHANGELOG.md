@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.3.0] - 2023-11-06
+
+* bump bevy version to `0.12.*`
+* bump gstreamer version to `1.18.*`
+
 ## [0.2.0] - 2023-07-10
 
 ### Changed
