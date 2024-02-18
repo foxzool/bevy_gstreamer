@@ -1,7 +1,7 @@
 use crate::camera::{BackgroundImageMarker, GstCamera};
 use bevy::prelude::*;
 use bevy::render::extract_resource::ExtractResource;
-use bevy::render::render_graph::{Node, RenderLabel};
+use bevy::render::render_graph::{Node, RenderLabel, RenderSubGraph};
 use bevy::render::render_graph::{NodeRunError, RenderGraphContext, SlotInfo};
 use bevy::render::render_resource::{
     AddressMode, BindGroup, BindGroupEntries, BindGroupLayoutEntry, BindingType, BlendComponent,
@@ -17,7 +17,6 @@ use bevy::render::render_resource::{
 use bevy::render::renderer::{RenderContext, RenderDevice, RenderQueue};
 use bevy::render::texture::BevyDefault;
 use bevy::render::view::{ExtractedView, ViewTarget};
-use bevy::ui::graph::SubGraphUi;
 use image::buffer::ConvertBuffer;
 use image::RgbaImage;
 
@@ -76,6 +75,9 @@ const INDICES: &[u16] = &[0, 1, 2, 2, 1, 3];
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, RenderLabel)]
 pub(crate) struct BackgroundNodeLabel;
+
+#[derive(Debug, Hash, PartialEq, Eq, Clone, RenderSubGraph)]
+pub struct BackgroundGraph;
 
 #[derive(Resource)]
 pub struct BackgroundPipeline {
@@ -178,7 +180,7 @@ impl Node for BackgroundPassDriverNode {
         _render_context: &mut RenderContext,
         _world: &World,
     ) -> Result<(), NodeRunError> {
-        graph.run_sub_graph(SubGraphUi, vec![], Some(graph.view_entity()))?;
+        graph.run_sub_graph(BackgroundGraph, vec![], Some(graph.view_entity()))?;
 
         Ok(())
     }
