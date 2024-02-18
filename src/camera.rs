@@ -8,10 +8,9 @@ use bevy::render::extract_resource::ExtractResourcePlugin;
 use bevy::render::render_graph::RenderGraph;
 use bevy::render::RenderApp;
 use glib::Quark;
-use gstreamer::prelude::ElementExtManual;
+use gstreamer::prelude::*;
 use gstreamer::{
     element_error,
-    glib::Cast,
     prelude::{DeviceExt, DeviceMonitorExt, DeviceMonitorExtManual, ElementExt, GstBinExt},
     Bin, Caps, ClockTime, DeviceMonitor, Element, FlowError, FlowSuccess, MessageView,
     ResourceError, State,
@@ -43,23 +42,25 @@ impl Plugin for WebCameraPlugin {
         let background_node_3d = BackgroundNode::new(&mut render_app.world);
         let mut render_graph = render_app.world.resource_mut::<RenderGraph>();
 
-        if let Some(graph_2d) = render_graph.get_sub_graph_mut(core_pipeline::core_2d::graph::NAME)
+        if let Some(graph_2d) =
+            render_graph.get_sub_graph_mut(core_pipeline::core_2d::graph::Core2d)
         {
-            graph_2d.add_node(BACKGROUND_NODE, background_node_2d);
+            graph_2d.add_node(BackgroundNodeLabel, background_node_2d);
 
             graph_2d.add_node_edge(
-                BACKGROUND_NODE,
-                core_pipeline::core_2d::graph::node::MAIN_PASS,
+                BackgroundNodeLabel,
+                core_pipeline::core_2d::graph::Node2d::MainPass,
             );
         }
 
-        if let Some(graph_3d) = render_graph.get_sub_graph_mut(core_pipeline::core_3d::graph::NAME)
+        if let Some(graph_3d) =
+            render_graph.get_sub_graph_mut(core_pipeline::core_3d::graph::Core3d)
         {
-            graph_3d.add_node(BACKGROUND_NODE, background_node_3d);
+            graph_3d.add_node(BackgroundNodeLabel, background_node_3d);
 
             graph_3d.add_node_edge(
-                BACKGROUND_NODE,
-                core_pipeline::core_3d::graph::node::MAIN_TRANSPARENT_PASS,
+                BackgroundNodeLabel,
+                core_pipeline::core_3d::graph::Node3d::MainTransparentPass,
             );
         }
     }
@@ -500,7 +501,7 @@ fn search_device(index: usize) -> Result<(CameraInfo, Option<Caps>), BevyGstErro
 fn generate_pipeline(fmt: CameraFormat, index: usize) -> Result<PipelineGenRet, BevyGstError> {
     let appsink_pipeline = webcam_pipeline(format!("{}", index).as_str(), fmt);
 
-    let pipeline = match gstreamer::parse_launch(&appsink_pipeline) {
+    let pipeline = match gstreamer::parse::launch(&appsink_pipeline) {
         Ok(p) => p,
         Err(why) => {
             return Err(BevyGstError::OpenDeviceError(
@@ -773,13 +774,13 @@ fn webcam_pipeline(device: &str, camera_format: CameraFormat) -> String {
 fn webcam_pipeline(device: &str, camera_format: CameraFormat) -> String {
     match camera_format.format() {
         FrameFormat::MJPEG => {
-            format!("ksvideosrc device_index={} ! image/jpeg, width={},height={},framerate={}/1 ! appsink name=appsink async=false sync=false", device, camera_format.width(), camera_format.height(), camera_format.frame_rate())
+            format!("mfvideosrc   device_index={} ! image/jpeg, width={},height={},framerate={}/1 ! appsink name=appsink async=false sync=false", device, camera_format.width(), camera_format.height(), camera_format.frame_rate())
         }
         FrameFormat::YUYV => {
-            format!("ksvideosrc device_index={} ! video/x-raw,format=YUY2,width={},height={},framerate={}/1 ! appsink name=appsink async=false sync=false", device, camera_format.width(), camera_format.height(), camera_format.frame_rate())
+            format!("mfvideosrc   device_index={} ! video/x-raw,format=YUY2,width={},height={},framerate={}/1 ! appsink name=appsink async=false sync=false", device, camera_format.width(), camera_format.height(), camera_format.frame_rate())
         }
         FrameFormat::GRAY => {
-            format!("ksvideosrc device_index={} ! video/x-raw,format=GRAY8,width={},height={},framerate={}/1 ! appsink name=appsink async=false sync=false", device, camera_format.width(), camera_format.height(), camera_format.frame_rate())
+            format!("mfvideosrc   device_index={} ! video/x-raw,format=GRAY8,width={},height={},framerate={}/1 ! appsink name=appsink async=false sync=false", device, camera_format.width(), camera_format.height(), camera_format.frame_rate())
         }
         _ => "unsupproted! if you see this, switch to something else!".to_string(),
     }

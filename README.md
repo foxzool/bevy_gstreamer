@@ -1,5 +1,5 @@
 # `bevy_gstreamer`
-![屏幕截图 2023-04-27 180916](https://user-images.githubusercontent.com/217027/234832021-cfd3cf1d-9c26-4e63-b7c1-6120949bd431.png)
+![2023-04-27 180916](https://user-images.githubusercontent.com/217027/234832021-cfd3cf1d-9c26-4e63-b7c1-6120949bd431.png)
 
 
 
@@ -31,6 +31,7 @@ $ brew install gstreamer gst-plugins-base gst-plugins-good \
 
 | bevy | bevy_gstreamer |
 |------|----------------|
+| 0.13 | 0.4.X          |
 | 0.12 | 0.3.X          |
 | 0.11 | 0.2.X          |
 | 0.10 | 0.1.X          |
