@@ -1,7 +1,8 @@
-use crate::camera::background::*;
-use crate::error::BevyGstError;
-use crate::types::{mjpeg_to_rgb24, CameraFormat, CameraInfo, FrameFormat};
-use crate::types::{yuyv422_to_rgb, Resolution};
+use std::borrow::Cow;
+use std::collections::HashMap;
+use std::str::FromStr;
+use std::sync::{Arc, Mutex};
+
 use bevy::core_pipeline;
 use bevy::prelude::*;
 use bevy::render::extract_resource::ExtractResourcePlugin;
@@ -20,10 +21,11 @@ use gstreamer_video::{VideoFormat, VideoInfo};
 use image::ImageBuffer;
 use image::{Rgb, RgbaImage};
 use regex::Regex;
-use std::borrow::Cow;
-use std::collections::HashMap;
-use std::str::FromStr;
-use std::sync::{Arc, Mutex};
+
+use crate::camera::background::*;
+use crate::error::BevyGstError;
+use crate::types::{mjpeg_to_rgb24, CameraFormat, CameraInfo, FrameFormat};
+use crate::types::{yuyv422_to_rgb, Resolution};
 
 type PipelineGenRet = (Element, AppSink, Arc<Mutex<ImageBuffer<Rgb<u8>, Vec<u8>>>>);
 
@@ -38,9 +40,9 @@ impl Plugin for WebCameraPlugin {
             .add_systems(Update, handle_background_image);
 
         let render_app = app.sub_app_mut(RenderApp);
-        let background_node_2d = BackgroundNode::new(&mut render_app.world);
-        let background_node_3d = BackgroundNode::new(&mut render_app.world);
-        let mut render_graph = render_app.world.resource_mut::<RenderGraph>();
+        let background_node_2d = BackgroundNode::new(render_app.world_mut());
+        let background_node_3d = BackgroundNode::new(render_app.world_mut());
+        let mut render_graph = render_app.world_mut().resource_mut::<RenderGraph>();
 
         if let Some(graph_2d) =
             render_graph.get_sub_graph_mut(core_pipeline::core_2d::graph::Core2d)
@@ -49,7 +51,7 @@ impl Plugin for WebCameraPlugin {
 
             graph_2d.add_node_edge(
                 BackgroundNodeLabel,
-                core_pipeline::core_2d::graph::Node2d::MainPass,
+                core_pipeline::core_2d::graph::Node2d::StartMainPass,
             );
         }
 
@@ -89,10 +91,7 @@ pub struct GstCamera {
 
 impl GstCamera {
     pub fn new(index: usize, format: Option<CameraFormat>) -> Result<Self, BevyGstError> {
-        let camera_format = match format {
-            None => CameraFormat::default(),
-            Some(fmt) => fmt,
-        };
+        let camera_format = format.unwrap_or_default();
 
         if let Err(why) = gstreamer::init() {
             return Err(BevyGstError::InitializeError(why.to_string()));

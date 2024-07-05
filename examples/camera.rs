@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+
 use bevy_gstreamer::camera::{BackgroundImageMarker, GstCamera};
 use bevy_gstreamer::types::{CameraFormat, FrameFormat};
 use bevy_gstreamer::GstreamerPlugin;
@@ -17,7 +18,7 @@ fn main() {
         .add_plugins(GstreamerPlugin)
         .add_systems(Startup, setup_camera)
         .add_systems(Update, camera_control)
-        .run()
+        .run();
 }
 
 fn setup_camera(
@@ -47,7 +48,7 @@ fn setup_camera(
     commands.spawn(PbrBundle {
         mesh: meshes.add(Cuboid::new(1.0, 1.0, 1.0)),
         material: materials.add(StandardMaterial {
-            base_color: Color::SEA_GREEN,
+            base_color: bevy::color::palettes::css::SEA_GREEN.into(),
             unlit: true,
             ..default()
         }),
