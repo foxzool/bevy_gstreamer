@@ -29,9 +29,8 @@ struct Vertex {
 
 impl Vertex {
     fn desc<'a>() -> RawVertexBufferLayout<'a> {
-        use std::mem;
         RawVertexBufferLayout {
-            array_stride: mem::size_of::<Vertex>() as BufferAddress,
+            array_stride: size_of::<Vertex>() as BufferAddress,
             step_mode: VertexStepMode::Vertex,
             attributes: &[
                 VertexAttribute {
@@ -40,7 +39,7 @@ impl Vertex {
                     format: VertexFormat::Float32x3,
                 },
                 VertexAttribute {
-                    offset: mem::size_of::<[f32; 3]>() as BufferAddress,
+                    offset: size_of::<[f32; 3]>() as BufferAddress,
                     shader_location: 1,
                     format: VertexFormat::Float32x2,
                 },
@@ -86,11 +85,13 @@ pub struct BackgroundPipeline {
 
 impl FromWorld for BackgroundPipeline {
     fn from_world(world: &mut World) -> Self {
-        let device = world.resource::<RenderDevice>();
-        let msaa = match world.get_resource::<Msaa>() {
-            None => Msaa::Sample4,
-            Some(msaa) => *msaa,
+        let mut query = world.query_filtered::<&Msaa, With<Camera>>();
+        let msaa = match query.get_single(world) {
+            Ok(m) => *m,
+            Err(_) => Msaa::Sample4,
         };
+        let device = world.resource::<RenderDevice>();
+
         let shader = device.create_shader_module(ShaderModuleDescriptor {
             label: Some("Webcam Shader"),
             source: ShaderSource::Wgsl(include_str!("shader.wgsl").into()),
@@ -167,6 +168,7 @@ impl FromWorld for BackgroundPipeline {
             // If the pipeline will be used with a multiview render pass, this
             // indicates how many array layers the attachments will have.
             multiview: None,
+            cache: None,
         });
 
         Self { render_pipeline }

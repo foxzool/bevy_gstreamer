@@ -1,26 +1,28 @@
 [package]
 name = "bevy_gstreamer"
 authors = ["FoxZoOL <zhooul@gmail.com>"]
-version = "0.5.0"
+version = "0.6.0-rc.1"
 edition = "2021"
 description = "GStreamer plugin for Bevy"
 keywords = ["camera", "webcam", "capture", "cross-platform", "gstreamer"]
 license = "MIT OR Apache-2.0"
 readme = "README.md"
 repository = "https://github.com/foxzool/bevy_gstreamer"
+homepage = "https://github.com/foxzool/bevy_gstreamer"
+documentation = "https://docs.rs/bevy_gstreamer"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-bevy = { version = "0.14.0", default-features = false, features = ["bevy_render", "bevy_core_pipeline", "bevy_asset", "bevy_winit", "bevy_pbr", "x11"] }
+bevy = { version = "0.15.0-rc.1", default-features = false, features = ["bevy_render", "bevy_core_pipeline", "bevy_asset", "bevy_winit", "bevy_pbr", "wayland"] }
 thiserror = "1.0"
-gstreamer = "0.22.1"
-gstreamer-app = "0.22.0"
-gstreamer-video = "0.22.1"
-glib = "0.19.2"
+gstreamer = "0.23.2"
+gstreamer-app = "0.23.2"
+gstreamer-video = "0.23.2"
+glib = "0.20.4"
 crossbeam = "0.8"
-image = { version = "=0.24", features = ["jpeg"] }
+image = { version = "0.25", features = ["jpeg"] }
 jpeg-decoder = "0.3.0"
 bytemuck = { version = "1.13", features = ["derive"] }
 regex = "1.7"
@@ -30,7 +32,7 @@ name = "camera"
 path = "examples/camera.rs"
 
 [dev-dependencies]
-bevy = { version = "0.14.0" }
+bevy = { version = "0.15.0-rc.1" }
 
 [profile.dev]
 opt-level = 1
