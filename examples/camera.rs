@@ -1,8 +1,8 @@
 use bevy::prelude::*;
 
+use bevy_gstreamer::GstreamerPlugin;
 use bevy_gstreamer::camera::{BackgroundImageMarker, GstCamera};
 use bevy_gstreamer::types::{CameraFormat, FrameFormat};
-use bevy_gstreamer::GstreamerPlugin;
 
 fn main() {
     App::new()
@@ -62,21 +62,21 @@ fn camera_control(
     mut q_camera: Query<&mut GstCamera, With<BackgroundImageMarker>>,
 ) {
     if keyboard_input.just_pressed(KeyCode::Digit1) {
-        if let Ok(mut cam) = q_camera.get_single_mut() {
+        if let Ok(mut cam) = q_camera.single_mut() {
             info!("start stream");
             cam.open_stream().unwrap();
         }
     }
 
     if keyboard_input.just_pressed(KeyCode::Digit2) {
-        if let Ok(mut cam) = q_camera.get_single_mut() {
+        if let Ok(mut cam) = q_camera.single_mut() {
             info!("stop stream");
             cam.stop_stream().unwrap();
         }
     }
 
     if keyboard_input.just_pressed(KeyCode::Digit3) {
-        if let Ok(mut cam) = q_camera.get_single_mut() {
+        if let Ok(mut cam) = q_camera.single_mut() {
             info!("change capture resolution to 1920x1080 30fps");
             cam.set_camera_format(CameraFormat::new_from(1920, 1080, FrameFormat::MJPEG, 30))
                 .unwrap();
@@ -84,7 +84,7 @@ fn camera_control(
     }
 
     if keyboard_input.just_pressed(KeyCode::Digit4) {
-        if let Ok(mut cam) = q_camera.get_single_mut() {
+        if let Ok(mut cam) = q_camera.single_mut() {
             info!("change capture resolution to 640x480 30fps");
             cam.set_camera_format(CameraFormat::new_from(640, 480, FrameFormat::MJPEG, 30))
                 .unwrap();

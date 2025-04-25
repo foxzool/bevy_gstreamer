@@ -217,7 +217,10 @@ pub fn buf_yuyv422_to_rgb(data: &[u8], dest: &mut [u8], rgba: bool) -> Result<()
         return Err(BevyGstError::ProcessFrameError {
             src: FrameFormat::YUYV,
             destination: "RGB888".to_string(),
-            error: format!("Assertion failure, the destination RGB buffer is of the wrong size! [expected: {rgb_buf_size}, actual: {}]", dest.len()),
+            error: format!(
+                "Assertion failure, the destination RGB buffer is of the wrong size! [expected: {rgb_buf_size}, actual: {}]",
+                dest.len()
+            ),
         });
     }
 

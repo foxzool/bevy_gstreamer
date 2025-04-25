@@ -1,4 +1,6 @@
 use crate::camera::{BackgroundImageMarker, GstCamera};
+use bevy::asset::RenderAssetUsages;
+use bevy::image::TextureFormatPixelInfo;
 use bevy::prelude::*;
 use bevy::render::extract_resource::ExtractResource;
 use bevy::render::render_graph::{Node, RenderLabel, RenderSubGraph};
@@ -6,19 +8,16 @@ use bevy::render::render_graph::{NodeRunError, RenderGraphContext, SlotInfo};
 use bevy::render::render_resource::{
     AddressMode, BindGroup, BindGroupEntries, BindGroupLayoutEntry, BindingType, BlendComponent,
     BlendState, Buffer, BufferAddress, BufferInitDescriptor, BufferUsages, ColorTargetState,
-    ColorWrites, Extent3d, Face, FilterMode, FrontFace, ImageCopyTexture, ImageDataLayout,
-    IndexFormat, MultisampleState, Origin3d, PipelineLayoutDescriptor, PolygonMode, PrimitiveState,
-    PrimitiveTopology, RawFragmentState, RawRenderPipelineDescriptor, RawVertexBufferLayout,
-    RawVertexState, RenderPassDescriptor, RenderPipeline, SamplerBindingType, SamplerDescriptor,
-    ShaderModuleDescriptor, ShaderSource, ShaderStages, TextureAspect, TextureDescriptor,
-    TextureDimension, TextureFormat, TextureSampleType, TextureUsages, TextureViewDescriptor,
-    TextureViewDimension, VertexAttribute, VertexFormat, VertexStepMode,
+    ColorWrites, Extent3d, Face, FilterMode, FrontFace, IndexFormat, MultisampleState,
+    PipelineLayoutDescriptor, PolygonMode, PrimitiveState, PrimitiveTopology, RawFragmentState,
+    RawRenderPipelineDescriptor, RawVertexBufferLayout, RawVertexState, RenderPassDescriptor,
+    RenderPipeline, SamplerBindingType, SamplerDescriptor, ShaderModuleDescriptor, ShaderSource,
+    ShaderStages, TexelCopyBufferLayout, TextureDescriptor, TextureDimension, TextureFormat,
+    TextureSampleType, TextureUsages, TextureViewDescriptor, TextureViewDimension, VertexAttribute,
+    VertexFormat, VertexStepMode,
 };
 use bevy::render::renderer::{RenderContext, RenderDevice, RenderQueue};
-use bevy::render::texture::BevyDefault;
 use bevy::render::view::{ExtractedView, ViewTarget};
-use image::buffer::ConvertBuffer;
-use image::RgbaImage;
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
@@ -49,7 +48,7 @@ impl Vertex {
 }
 
 #[derive(Deref, DerefMut, Default, Resource, ExtractResource, Clone)]
-pub struct BackgroundImage(pub RgbaImage);
+pub struct BackgroundImage(pub Image);
 
 const VERTICES: &[Vertex] = &[
     Vertex {
@@ -86,13 +85,13 @@ pub struct BackgroundPipeline {
 impl FromWorld for BackgroundPipeline {
     fn from_world(world: &mut World) -> Self {
         let mut query = world.query_filtered::<&Msaa, With<Camera>>();
-        let msaa = match query.get_single(world) {
+        let msaa = match query.single(world) {
             Ok(m) => *m,
             Err(_) => Msaa::Sample4,
         };
         let device = world.resource::<RenderDevice>();
 
-        let shader = device.create_shader_module(ShaderModuleDescriptor {
+        let shader = device.create_and_validate_shader_module(ShaderModuleDescriptor {
             label: Some("Webcam Shader"),
             source: ShaderSource::Wgsl(include_str!("shader.wgsl").into()),
         });
@@ -130,13 +129,13 @@ impl FromWorld for BackgroundPipeline {
             layout: Some(&render_pipeline_layout),
             vertex: RawVertexState {
                 module: &shader,
-                entry_point: "vs_main",
+                entry_point: Some("vs_main"),
                 compilation_options: Default::default(),
                 buffers: &[Vertex::desc()],
             },
             fragment: Some(RawFragmentState {
                 module: &shader,
-                entry_point: "fs_main",
+                entry_point: Some("fs_main"),
                 compilation_options: Default::default(),
                 targets: &[Some(ColorTargetState {
                     format: TextureFormat::bevy_default(),
@@ -237,11 +236,9 @@ impl Node for BackgroundNode {
                 self.vertex_buffer = Some(vertex_buffer)
             }
 
-            let dimensions = img.0.dimensions();
-
             let size = Extent3d {
-                width: dimensions.0,
-                height: dimensions.1,
+                width: img.width(),
+                height: img.height(),
                 depth_or_array_layers: 1,
             };
             let texture = device.create_texture(&TextureDescriptor {
@@ -254,21 +251,16 @@ impl Node for BackgroundNode {
                 usage: TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_DST,
                 view_formats: &[],
             });
-
+            let format_size = img.texture_descriptor.format.pixel_size();
             queue.write_texture(
-                ImageCopyTexture {
-                    aspect: TextureAspect::All,
-                    texture: &texture,
-                    mip_level: 0,
-                    origin: Origin3d::ZERO,
-                },
-                &img.0,
-                ImageDataLayout {
+                texture.as_image_copy(),
+                img.data.as_ref().expect("Image has no data"),
+                TexelCopyBufferLayout {
                     offset: 0,
-                    bytes_per_row: Some(4 * dimensions.0),
-                    rows_per_image: Some(dimensions.1),
+                    bytes_per_row: Some(img.width() * format_size as u32),
+                    rows_per_image: None,
                 },
-                size,
+                img.texture_descriptor.size,
             );
 
             let view = texture.create_view(&TextureViewDescriptor::default());
@@ -355,9 +347,17 @@ pub fn handle_background_image(
     mut image: ResMut<BackgroundImage>,
     mut cam_query: Query<&mut GstCamera, With<BackgroundImageMarker>>,
 ) {
-    if let Ok(mut cam) = cam_query.get_single_mut() {
+    if let Ok(mut cam) = cam_query.single_mut() {
         if let Ok(frame) = cam.frame() {
-            image.0 = frame.convert();
+            let size = Extent3d {
+                width: frame.width(),
+                height: frame.height(),
+                depth_or_array_layers: 1,
+            };
+            let dimensions = TextureDimension::D2;
+            let format = TextureFormat::Rgba8Unorm;
+            let asset_usage = RenderAssetUsages::default();
+            image.0 = Image::new(size, dimensions, frame.to_vec(), format, asset_usage);
         }
     }
 }

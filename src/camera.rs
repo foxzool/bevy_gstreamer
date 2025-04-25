@@ -5,27 +5,26 @@ use std::sync::{Arc, Mutex};
 
 use bevy::core_pipeline;
 use bevy::prelude::*;
+use bevy::render::RenderApp;
 use bevy::render::extract_resource::ExtractResourcePlugin;
 use bevy::render::render_graph::RenderGraph;
-use bevy::render::RenderApp;
 use glib::Quark;
 use gstreamer::prelude::*;
 use gstreamer::{
-    element_error,
-    prelude::{DeviceExt, DeviceMonitorExt, DeviceMonitorExtManual, ElementExt, GstBinExt},
     Bin, Caps, ClockTime, DeviceMonitor, Element, FlowError, FlowSuccess, MessageView,
-    ResourceError, State,
+    ResourceError, State, element_error,
+    prelude::{DeviceExt, DeviceMonitorExt, DeviceMonitorExtManual, ElementExt, GstBinExt},
 };
 use gstreamer_app::{AppSink, AppSinkCallbacks};
 use gstreamer_video::{VideoFormat, VideoInfo};
 use image::ImageBuffer;
-use image::{Rgb, RgbaImage};
+use image::Rgb;
 use regex::Regex;
 
 use crate::camera::background::*;
 use crate::error::BevyGstError;
-use crate::types::{mjpeg_to_rgb24, CameraFormat, CameraInfo, FrameFormat};
-use crate::types::{yuyv422_to_rgb, Resolution};
+use crate::types::{CameraFormat, CameraInfo, FrameFormat, mjpeg_to_rgb24};
+use crate::types::{Resolution, yuyv422_to_rgb};
 
 type PipelineGenRet = (Element, AppSink, Arc<Mutex<ImageBuffer<Rgb<u8>, Vec<u8>>>>);
 
@@ -35,7 +34,7 @@ pub struct WebCameraPlugin;
 
 impl Plugin for WebCameraPlugin {
     fn build(&self, app: &mut App) {
-        app.insert_resource(BackgroundImage(RgbaImage::new(640, 480)))
+        app.insert_resource(BackgroundImage(Image::default()))
             .add_plugins(ExtractResourcePlugin::<BackgroundImage>::default())
             .add_systems(Update, handle_background_image);
 
@@ -153,14 +152,14 @@ impl GstCamera {
             None => {
                 return Err(BevyGstError::ReadFrameError(
                     "The pipeline has no bus!".to_string(),
-                ))
+                ));
             }
         };
 
         if let Some(message) = bus.timed_pop(ClockTime::from_seconds(0)) {
             match message.view() {
                 MessageView::Eos(..) => {
-                    return Err(BevyGstError::ReadFrameError("Stream is ended!".to_string()))
+                    return Err(BevyGstError::ReadFrameError("Stream is ended!".to_string()));
                 }
                 MessageView::Error(err) => {
                     return Err(BevyGstError::ReadFrameError(format!(
@@ -251,7 +250,7 @@ impl GstCamera {
                                             property: "Capibilities by Resolution: Width"
                                                 .to_string(),
                                             error: why.to_string(),
-                                        })
+                                        });
                                     }
                                 };
                                 let height = match capability.get::<i32>("height") {
@@ -261,7 +260,7 @@ impl GstCamera {
                                             property: "Capibilities by Resolution: Height"
                                                 .to_string(),
                                             error: why.to_string(),
-                                        })
+                                        });
                                     }
                                 };
                                 let value =
@@ -285,7 +284,7 @@ impl GstCamera {
                                                 property: "Framerates".to_string(),
                                                 error: "Failed to get framerates: doesnt exist!"
                                                     .to_string(),
-                                            })
+                                            });
                                         }
                                     };
 
@@ -293,7 +292,13 @@ impl GstCamera {
                                     let fraction_string: Vec<&str> =
                                         m.as_str().split('/').collect();
                                     if fraction_string.len() != 2 {
-                                        return Err(BevyGstError::GetPropertyError { property: "Framerates".to_string(), error: format!("Fraction framerate had more than one demoninator: {:?}", fraction_string) });
+                                        return Err(BevyGstError::GetPropertyError {
+                                            property: "Framerates".to_string(),
+                                            error: format!(
+                                                "Fraction framerate had more than one demoninator: {:?}",
+                                                fraction_string
+                                            ),
+                                        });
                                     }
 
                                     if let Some(v) = fraction_string.get(1) {
@@ -338,7 +343,7 @@ impl GstCamera {
                                             property: "Capibilities by Resolution: Width"
                                                 .to_string(),
                                             error: why.to_string(),
-                                        })
+                                        });
                                     }
                                 };
                                 let height = match capability.get::<i32>("height") {
@@ -348,7 +353,7 @@ impl GstCamera {
                                             property: "Capibilities by Resolution: Height"
                                                 .to_string(),
                                             error: why.to_string(),
-                                        })
+                                        });
                                     }
                                 };
                                 let value =
@@ -372,7 +377,7 @@ impl GstCamera {
                                                 property: "Framerates".to_string(),
                                                 error: "Failed to get framerates: doesnt exist!"
                                                     .to_string(),
-                                            })
+                                            });
                                         }
                                     };
 
@@ -380,7 +385,13 @@ impl GstCamera {
                                     let fraction_string: Vec<&str> =
                                         m.as_str().split('/').collect();
                                     if fraction_string.len() != 2 {
-                                        return Err(BevyGstError::GetPropertyError { property: "Framerates".to_string(), error: format!("Fraction framerate had more than one demoninator: {:?}", fraction_string) });
+                                        return Err(BevyGstError::GetPropertyError {
+                                            property: "Framerates".to_string(),
+                                            error: format!(
+                                                "Fraction framerate had more than one demoninator: {:?}",
+                                                fraction_string
+                                            ),
+                                        });
                                     }
 
                                     if let Some(v) = fraction_string.get(1) {
@@ -415,7 +426,7 @@ impl GstCamera {
                         unsupported => {
                             return Err(BevyGstError::NotImplementedError(format!(
                                 "Not supported frame format {unsupported:?}"
-                            )))
+                            )));
                         }
                     }
                 }
@@ -424,7 +435,7 @@ impl GstCamera {
                 return Err(BevyGstError::GetPropertyError {
                     property: "Device Caps".to_string(),
                     error: "No device caps!".to_string(),
-                })
+                });
             }
         }
 
@@ -442,7 +453,7 @@ fn search_device(index: usize) -> Result<(CameraInfo, Option<Caps>), BevyGstErro
             return Err(BevyGstError::GeneralError(format!(
                 "Failed to generate caps: {}",
                 why
-            )))
+            )));
         }
     };
 
@@ -455,7 +466,7 @@ fn search_device(index: usize) -> Result<(CameraInfo, Option<Caps>), BevyGstErro
                 return Err(BevyGstError::StructureError {
                     structure: "Video Filter ID Source/Video".to_string(),
                     error: "Null".to_string(),
-                })
+                });
             }
         },
     };
@@ -478,7 +489,7 @@ fn search_device(index: usize) -> Result<(CameraInfo, Option<Caps>), BevyGstErro
             return Err(BevyGstError::OpenDeviceError(
                 index.to_string(),
                 "No device".to_string(),
-            ))
+            ));
         }
     };
     device_monitor.stop();
@@ -510,7 +521,7 @@ fn generate_pipeline(fmt: CameraFormat, index: usize) -> Result<PipelineGenRet, 
                     webcam_pipeline(format!("{}", index).as_str(), fmt),
                     why
                 ),
-            ))
+            ));
         }
     };
 
@@ -525,7 +536,7 @@ fn generate_pipeline(fmt: CameraFormat, index: usize) -> Result<PipelineGenRet, 
             return Err(BevyGstError::OpenDeviceError(
                 index.to_string(),
                 "Failed to get sink element!".to_string(),
-            ))
+            ));
         }
     };
 
@@ -535,7 +546,7 @@ fn generate_pipeline(fmt: CameraFormat, index: usize) -> Result<PipelineGenRet, 
             return Err(BevyGstError::OpenDeviceError(
                 index.to_string(),
                 "Failed to get sink element as appsink".to_string(),
-            ))
+            ));
         }
     };
 
@@ -737,17 +748,33 @@ fn generate_pipeline(fmt: CameraFormat, index: usize) -> Result<PipelineGenRet, 
 fn webcam_pipeline(device: &str, camera_format: CameraFormat) -> String {
     match camera_format.format() {
         FrameFormat::MJPEG => {
-            format!("autovideosrc location=/dev/video{} ! image/jpeg,width={},height={},framerate={}/1 ! appsink name=appsink async=false sync=false", device, camera_format.width(), camera_format.height(), camera_format.frame_rate())
+            format!(
+                "autovideosrc location=/dev/video{} ! image/jpeg,width={},height={},framerate={}/1 ! appsink name=appsink async=false sync=false",
+                device,
+                camera_format.width(),
+                camera_format.height(),
+                camera_format.frame_rate()
+            )
         }
         FrameFormat::YUYV => {
-            format!("autovideosrc location=/dev/video{} ! video/x-raw,format=YUY2,width={},height={},framerate={}/1 ! appsink name=appsink async=false sync=false", device, camera_format.width(), camera_format.height(), camera_format.frame_rate())
+            format!(
+                "autovideosrc location=/dev/video{} ! video/x-raw,format=YUY2,width={},height={},framerate={}/1 ! appsink name=appsink async=false sync=false",
+                device,
+                camera_format.width(),
+                camera_format.height(),
+                camera_format.frame_rate()
+            )
         }
         FrameFormat::GRAY => {
-            format!("autovideosrc location=/dev/video{} ! video/x-raw,format=GRAY8,width={},height={},framerate={}/1 ! appsink name=appsink async=false sync=false", device, camera_format.width(), camera_format.height(), camera_format.frame_rate())
+            format!(
+                "autovideosrc location=/dev/video{} ! video/x-raw,format=GRAY8,width={},height={},framerate={}/1 ! appsink name=appsink async=false sync=false",
+                device,
+                camera_format.width(),
+                camera_format.height(),
+                camera_format.frame_rate()
+            )
         }
-        _ => {
-            format!("unsupproted! if you see this, switch to something else!")
-        }
+        _ => "unsupproted! if you see this, switch to something else!".to_string(),
     }
 }
 
@@ -755,17 +782,33 @@ fn webcam_pipeline(device: &str, camera_format: CameraFormat) -> String {
 fn webcam_pipeline(device: &str, camera_format: CameraFormat) -> String {
     match camera_format.format() {
         FrameFormat::MJPEG => {
-            format!("v4l2src device=/dev/video{} ! image/jpeg, width={},height={},framerate={}/1 ! appsink name=appsink async=false sync=false", device, camera_format.width(), camera_format.height(), camera_format.frame_rate())
+            format!(
+                "v4l2src device=/dev/video{} ! image/jpeg, width={},height={},framerate={}/1 ! appsink name=appsink async=false sync=false",
+                device,
+                camera_format.width(),
+                camera_format.height(),
+                camera_format.frame_rate()
+            )
         }
         FrameFormat::YUYV => {
-            format!("v4l2src device=/dev/video{} ! video/x-raw,format=YUY2,width={},height={},framerate={}/1 ! appsink name=appsink async=false sync=false", device, camera_format.width(), camera_format.height(), camera_format.frame_rate())
+            format!(
+                "v4l2src device=/dev/video{} ! video/x-raw,format=YUY2,width={},height={},framerate={}/1 ! appsink name=appsink async=false sync=false",
+                device,
+                camera_format.width(),
+                camera_format.height(),
+                camera_format.frame_rate()
+            )
         }
         FrameFormat::GRAY => {
-            format!("v4l2src device=/dev/video{} ! video/x-raw,format=GRAY8,width={},height={},framerate={}/1 ! appsink name=appsink async=false sync=false", device, camera_format.width(), camera_format.height(), camera_format.frame_rate())
+            format!(
+                "v4l2src device=/dev/video{} ! video/x-raw,format=GRAY8,width={},height={},framerate={}/1 ! appsink name=appsink async=false sync=false",
+                device,
+                camera_format.width(),
+                camera_format.height(),
+                camera_format.frame_rate()
+            )
         }
-        _ => {
-            "unsupported! if you see this, switch to something else!".to_string()
-        }
+        _ => "unsupported! if you see this, switch to something else!".to_string(),
     }
 }
 
@@ -773,13 +816,31 @@ fn webcam_pipeline(device: &str, camera_format: CameraFormat) -> String {
 fn webcam_pipeline(device: &str, camera_format: CameraFormat) -> String {
     match camera_format.format() {
         FrameFormat::MJPEG => {
-            format!("mfvideosrc   device_index={} ! image/jpeg, width={},height={},framerate={}/1 ! appsink name=appsink async=false sync=false", device, camera_format.width(), camera_format.height(), camera_format.frame_rate())
+            format!(
+                "mfvideosrc   device_index={} ! image/jpeg, width={},height={},framerate={}/1 ! appsink name=appsink async=false sync=false",
+                device,
+                camera_format.width(),
+                camera_format.height(),
+                camera_format.frame_rate()
+            )
         }
         FrameFormat::YUYV => {
-            format!("mfvideosrc   device_index={} ! video/x-raw,format=YUY2,width={},height={},framerate={}/1 ! appsink name=appsink async=false sync=false", device, camera_format.width(), camera_format.height(), camera_format.frame_rate())
+            format!(
+                "mfvideosrc   device_index={} ! video/x-raw,format=YUY2,width={},height={},framerate={}/1 ! appsink name=appsink async=false sync=false",
+                device,
+                camera_format.width(),
+                camera_format.height(),
+                camera_format.frame_rate()
+            )
         }
         FrameFormat::GRAY => {
-            format!("mfvideosrc   device_index={} ! video/x-raw,format=GRAY8,width={},height={},framerate={}/1 ! appsink name=appsink async=false sync=false", device, camera_format.width(), camera_format.height(), camera_format.frame_rate())
+            format!(
+                "mfvideosrc   device_index={} ! video/x-raw,format=GRAY8,width={},height={},framerate={}/1 ! appsink name=appsink async=false sync=false",
+                device,
+                camera_format.width(),
+                camera_format.height(),
+                camera_format.frame_rate()
+            )
         }
         _ => "unsupproted! if you see this, switch to something else!".to_string(),
     }
