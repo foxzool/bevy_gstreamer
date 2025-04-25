@@ -49,11 +49,14 @@ $ brew install gstreamer gst-plugins-base gst-plugins-good \
 | 0.11 | 0.2            |
 | 0.10 | 0.1            |
 
-# Licensing
+## License
 
-The project is under dual license MIT and Apache 2.0, so join to your hearts content, just remember the license
-agreements.
+Dual-licensed under either:
 
-# Contributing
+- [`MIT`](LICENSE-MIT): [http://opensource.org/licenses/MIT](http://opensource.org/licenses/MIT)
+- [`Apache 2.0`](LICENSE-APACHE): [http://www.apache.org/licenses/LICENSE-2.0](http://www.apache.org/licenses/LICENSE-2.0)
 
-Yes this project is still very much WIP, so PRs are very welcome
+At your option. This means that when using this crate in your game, you may choose which license to use.
+
+Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in the work by you, as
+defined in the Apache-2.0 license, shall be dually licensed as above, without any additional terms or conditions.
