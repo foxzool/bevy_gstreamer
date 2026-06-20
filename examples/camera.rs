@@ -9,7 +9,7 @@ fn main() {
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
                 title: "gstreamer capture".into(),
-                resolution: (640., 480.).into(),
+                resolution: (640, 480).into(),
 
                 ..default()
             }),
@@ -45,7 +45,7 @@ fn setup_camera(
     // light
     commands.spawn((
         PointLight {
-            shadows_enabled: true,
+            shadow_maps_enabled: true,
             ..default()
         },
         Transform::from_xyz(4.0, 8.0, 4.0),

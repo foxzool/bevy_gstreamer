@@ -41,6 +41,7 @@ $ brew install gstreamer gst-plugins-base gst-plugins-good \
 
 | bevy | bevy_gstreamer |
 |------|----------------|
+| 0.19 | 0.8            |
 | 0.16 | 0.7            |
 | 0.15 | 0.6            |
 | 0.14 | 0.5            |
