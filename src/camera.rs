@@ -3,11 +3,10 @@ use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 
-use bevy::core_pipeline;
+use bevy::core_pipeline::{Core2d, Core2dSystems, Core3d, Core3dSystems};
 use bevy::prelude::*;
 use bevy::render::RenderApp;
 use bevy::render::extract_resource::ExtractResourcePlugin;
-use bevy::render::render_graph::RenderGraph;
 use glib::Quark;
 use gstreamer::prelude::*;
 use gstreamer::{
@@ -39,31 +38,18 @@ impl Plugin for WebCameraPlugin {
             .add_systems(Update, handle_background_image);
 
         let render_app = app.sub_app_mut(RenderApp);
-        let background_node_2d = BackgroundNode::new(render_app.world_mut());
-        let background_node_3d = BackgroundNode::new(render_app.world_mut());
-        let mut render_graph = render_app.world_mut().resource_mut::<RenderGraph>();
-
-        if let Some(graph_2d) =
-            render_graph.get_sub_graph_mut(core_pipeline::core_2d::graph::Core2d)
-        {
-            graph_2d.add_node(BackgroundNodeLabel, background_node_2d);
-
-            graph_2d.add_node_edge(
-                BackgroundNodeLabel,
-                core_pipeline::core_2d::graph::Node2d::StartMainPass,
+        // In Bevy 0.19 the render graph was removed; render passes are now regular
+        // systems scheduled in Core2d / Core3d. The background quad is drawn in the
+        // MainPass set for both 2D and 3D views.
+        render_app
+            .add_systems(
+                Core2d,
+                background_render_system.in_set(Core2dSystems::MainPass),
+            )
+            .add_systems(
+                Core3d,
+                background_render_system.in_set(Core3dSystems::MainPass),
             );
-        }
-
-        if let Some(graph_3d) =
-            render_graph.get_sub_graph_mut(core_pipeline::core_3d::graph::Core3d)
-        {
-            graph_3d.add_node(BackgroundNodeLabel, background_node_3d);
-
-            graph_3d.add_node_edge(
-                BackgroundNodeLabel,
-                core_pipeline::core_3d::graph::Node3d::MainTransparentPass,
-            );
-        }
     }
 
     fn finish(&self, app: &mut App) {

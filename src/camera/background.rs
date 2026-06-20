@@ -3,10 +3,8 @@ use bevy::asset::RenderAssetUsages;
 use bevy::image::TextureFormatPixelInfo;
 use bevy::prelude::*;
 use bevy::render::extract_resource::ExtractResource;
-use bevy::render::render_graph::{Node, RenderLabel, RenderSubGraph};
-use bevy::render::render_graph::{NodeRunError, RenderGraphContext, SlotInfo};
 use bevy::render::render_resource::{
-    AddressMode, BindGroup, BindGroupEntries, BindGroupLayoutEntry, BindingType, BlendComponent,
+    AddressMode, BindGroupEntries, BindGroupLayoutEntry, BindingType, BlendComponent,
     BlendState, Buffer, BufferAddress, BufferInitDescriptor, BufferUsages, ColorTargetState,
     ColorWrites, Extent3d, Face, FilterMode, FrontFace, IndexFormat, MultisampleState,
     PipelineLayoutDescriptor, PolygonMode, PrimitiveState, PrimitiveTopology, RawFragmentState,
@@ -14,10 +12,10 @@ use bevy::render::render_resource::{
     RenderPipeline, SamplerBindingType, SamplerDescriptor, ShaderModuleDescriptor, ShaderSource,
     ShaderStages, TexelCopyBufferLayout, TextureDescriptor, TextureDimension, TextureFormat,
     TextureSampleType, TextureUsages, TextureViewDescriptor, TextureViewDimension, VertexAttribute,
-    VertexFormat, VertexStepMode,
+    VertexFormat, VertexStepMode, MipmapFilterMode,
 };
-use bevy::render::renderer::{RenderContext, RenderDevice, RenderQueue};
-use bevy::render::view::{ExtractedView, ViewTarget};
+use bevy::render::renderer::{RenderContext, RenderDevice, RenderQueue, ViewQuery};
+use bevy::render::view::ViewTarget;
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
@@ -71,12 +69,6 @@ const VERTICES: &[Vertex] = &[
 
 const INDICES: &[u16] = &[0, 1, 2, 2, 1, 3];
 
-#[derive(Debug, Hash, PartialEq, Eq, Clone, RenderLabel)]
-pub(crate) struct BackgroundNodeLabel;
-
-#[derive(Debug, Hash, PartialEq, Eq, Clone, RenderSubGraph)]
-pub struct BackgroundGraph;
-
 #[derive(Resource)]
 pub struct BackgroundPipeline {
     render_pipeline: RenderPipeline,
@@ -120,8 +112,8 @@ impl FromWorld for BackgroundPipeline {
 
         let render_pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
             label: Some("Webcam Render Pipeline Layout"),
-            bind_group_layouts: &[&texture_bind_group_layout],
-            push_constant_ranges: &[],
+            bind_group_layouts: &[Some(&texture_bind_group_layout)],
+            immediate_size: 0,
         });
 
         let render_pipeline = device.create_render_pipeline(&RawRenderPipelineDescriptor {
@@ -138,7 +130,7 @@ impl FromWorld for BackgroundPipeline {
                 entry_point: Some("fs_main"),
                 compilation_options: Default::default(),
                 targets: &[Some(ColorTargetState {
-                    format: TextureFormat::bevy_default(),
+                    format: TextureFormat::Rgba8UnormSrgb,
                     blend: Some(BlendState {
                         color: BlendComponent::REPLACE,
                         alpha: BlendComponent::REPLACE,
@@ -166,7 +158,7 @@ impl FromWorld for BackgroundPipeline {
             },
             // If the pipeline will be used with a multiview render pass, this
             // indicates how many array layers the attachments will have.
-            multiview: None,
+            multiview_mask: None,
             cache: None,
         });
 
@@ -174,173 +166,147 @@ impl FromWorld for BackgroundPipeline {
     }
 }
 
-pub struct BackgroundPassDriverNode;
-
-impl Node for BackgroundPassDriverNode {
-    fn run(
-        &self,
-        graph: &mut RenderGraphContext,
-        _render_context: &mut RenderContext,
-        _world: &World,
-    ) -> Result<(), NodeRunError> {
-        graph.run_sub_graph(BackgroundGraph, vec![], Some(graph.view_entity()))?;
-
-        Ok(())
-    }
-}
-
-pub struct BackgroundNode {
-    query: QueryState<&'static ViewTarget, With<ExtractedView>>,
+/// GPU resources that persist across frames for the background pass. The vertex
+/// and index buffers are allocated lazily on first use; the texture and bind
+/// group are rebuilt every frame because the webcam image changes each frame.
+pub struct BackgroundGpuState {
     vertex_buffer: Option<Buffer>,
     index_buffer: Option<Buffer>,
-    diffuse_bind_group: Option<BindGroup>,
 }
 
-impl BackgroundNode {
-    pub fn new(world: &mut World) -> Self {
+impl Default for BackgroundGpuState {
+    fn default() -> Self {
         Self {
-            query: QueryState::new(world),
-
             vertex_buffer: None,
             index_buffer: None,
-            diffuse_bind_group: None,
         }
     }
 }
 
-impl Node for BackgroundNode {
-    fn input(&self) -> Vec<SlotInfo> {
-        vec![]
+/// Renders the webcam background quad. In Bevy 0.19 this is a regular system
+/// scheduled per view inside the `Core2d` / `Core3d` schedules (the old render
+/// graph `Node` was removed). It is added once to each schedule in
+/// `WebCameraPlugin::build`.
+pub fn background_render_system(
+    view: ViewQuery<&ViewTarget>,
+    pipeline: Res<BackgroundPipeline>,
+    background: Option<Res<BackgroundImage>>,
+    device: Res<RenderDevice>,
+    queue: Res<RenderQueue>,
+    mut state: Local<BackgroundGpuState>,
+    mut ctx: RenderContext,
+) {
+    let Some(background) = background else {
+        return;
+    };
+    let img = &background.0;
+
+    // Lazily create the static geometry buffers once.
+    if state.index_buffer.is_none() {
+        state.index_buffer = Some(device.create_buffer_with_data(&BufferInitDescriptor {
+            label: Some("Index Buffer"),
+            contents: bytemuck::cast_slice(INDICES),
+            usage: BufferUsages::INDEX,
+        }));
+    }
+    if state.vertex_buffer.is_none() {
+        state.vertex_buffer = Some(device.create_buffer_with_data(&BufferInitDescriptor {
+            label: Some("Vertex Buffer"),
+            contents: bytemuck::cast_slice(VERTICES),
+            usage: BufferUsages::VERTEX,
+        }));
     }
 
-    fn update(&mut self, world: &mut World) {
-        self.query.update_archetypes(world);
-        if let Some(img) = world.get_resource::<BackgroundImage>() {
-            let device = world.get_resource::<RenderDevice>().unwrap();
-            let queue = world.get_resource::<RenderQueue>().unwrap();
+    let size = Extent3d {
+        width: img.width(),
+        height: img.height(),
+        depth_or_array_layers: 1,
+    };
+    let texture = device.create_texture(&TextureDescriptor {
+        label: Some("webcam_img"),
+        size,
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: TextureDimension::D2,
+        format: TextureFormat::Rgba8UnormSrgb,
+        usage: TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_DST,
+        view_formats: &[],
+    });
+    let format_size = img
+        .texture_descriptor
+        .format
+        .pixel_size()
+        .unwrap_or(4);
+    queue.write_texture(
+        texture.as_image_copy(),
+        img.data.as_ref().expect("Image has no data"),
+        TexelCopyBufferLayout {
+            offset: 0,
+            bytes_per_row: Some(img.width() * format_size as u32),
+            rows_per_image: None,
+        },
+        img.texture_descriptor.size,
+    );
 
-            if self.index_buffer.is_none() {
-                let index_buffer = device.create_buffer_with_data(&BufferInitDescriptor {
-                    label: Some("Index Buffer"),
-                    contents: bytemuck::cast_slice(INDICES),
-                    usage: BufferUsages::INDEX,
-                });
-                self.index_buffer = Some(index_buffer)
-            }
-            if self.vertex_buffer.is_none() {
-                let vertex_buffer = device.create_buffer_with_data(&BufferInitDescriptor {
-                    label: Some("Vertex Buffer"),
-                    contents: bytemuck::cast_slice(VERTICES),
-                    usage: BufferUsages::VERTEX,
-                });
-                self.vertex_buffer = Some(vertex_buffer)
-            }
-
-            let size = Extent3d {
-                width: img.width(),
-                height: img.height(),
-                depth_or_array_layers: 1,
-            };
-            let texture = device.create_texture(&TextureDescriptor {
-                label: Some("webcam_img"),
-                size,
-                mip_level_count: 1,
-                sample_count: 1,
-                dimension: TextureDimension::D2,
-                format: TextureFormat::Rgba8UnormSrgb,
-                usage: TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_DST,
-                view_formats: &[],
-            });
-            let format_size = img.texture_descriptor.format.pixel_size();
-            queue.write_texture(
-                texture.as_image_copy(),
-                img.data.as_ref().expect("Image has no data"),
-                TexelCopyBufferLayout {
-                    offset: 0,
-                    bytes_per_row: Some(img.width() * format_size as u32),
-                    rows_per_image: None,
-                },
-                img.texture_descriptor.size,
-            );
-
-            let view = texture.create_view(&TextureViewDescriptor::default());
-            let sampler = device.create_sampler(&SamplerDescriptor {
-                address_mode_u: AddressMode::ClampToEdge,
-                address_mode_v: AddressMode::ClampToEdge,
-                address_mode_w: AddressMode::ClampToEdge,
+    let view_texture = texture.create_view(&TextureViewDescriptor::default());
+    let sampler = device.create_sampler(&SamplerDescriptor {
+        address_mode_u: AddressMode::ClampToEdge,
+        address_mode_v: AddressMode::ClampToEdge,
+        address_mode_w: AddressMode::ClampToEdge,
                 mag_filter: FilterMode::Linear,
                 min_filter: FilterMode::Nearest,
-                mipmap_filter: FilterMode::Nearest,
-                ..Default::default()
-            });
+                mipmap_filter: MipmapFilterMode::Nearest,
+        ..Default::default()
+    });
 
-            let texture_bind_group_layout = device.create_bind_group_layout(
-                "texture_bind_group_layout",
-                &[
-                    BindGroupLayoutEntry {
-                        binding: 0,
-                        visibility: ShaderStages::FRAGMENT,
-                        ty: BindingType::Texture {
-                            multisampled: false,
-                            view_dimension: TextureViewDimension::D2,
-                            sample_type: TextureSampleType::Float { filterable: true },
-                        },
-                        count: None,
-                    },
-                    BindGroupLayoutEntry {
-                        binding: 1,
-                        visibility: ShaderStages::FRAGMENT,
-                        ty: BindingType::Sampler(SamplerBindingType::Filtering),
-                        count: None,
-                    },
-                ],
-            );
+    let texture_bind_group_layout = device.create_bind_group_layout(
+        "texture_bind_group_layout",
+        &[
+            BindGroupLayoutEntry {
+                binding: 0,
+                visibility: ShaderStages::FRAGMENT,
+                ty: BindingType::Texture {
+                    multisampled: false,
+                    view_dimension: TextureViewDimension::D2,
+                    sample_type: TextureSampleType::Float { filterable: true },
+                },
+                count: None,
+            },
+            BindGroupLayoutEntry {
+                binding: 1,
+                visibility: ShaderStages::FRAGMENT,
+                ty: BindingType::Sampler(SamplerBindingType::Filtering),
+                count: None,
+            },
+        ],
+    );
 
-            let diffuse_bind_group = device.create_bind_group(
-                Some("diffuse_bind_group"),
-                &texture_bind_group_layout,
-                &BindGroupEntries::sequential((&view, &sampler)),
-            );
+    let diffuse_bind_group = device.create_bind_group(
+        Some("diffuse_bind_group"),
+        &texture_bind_group_layout,
+        &BindGroupEntries::sequential((&view_texture, &sampler)),
+    );
 
-            self.diffuse_bind_group = Some(diffuse_bind_group);
-        }
-    }
+    let target = view.into_inner();
+    let pass_descriptor = RenderPassDescriptor {
+        label: Some("background_pass"),
+        color_attachments: &[Some(target.get_color_attachment())],
+        depth_stencil_attachment: None,
+        timestamp_writes: None,
+        occlusion_query_set: None,
+        multiview_mask: None,
+    };
 
-    fn run(
-        &self,
-        _graph: &mut RenderGraphContext,
-        render_context: &mut RenderContext,
-        world: &World,
-    ) -> Result<(), NodeRunError> {
-        for target in self.query.iter_manual(world) {
-            let pipeline = world.get_resource::<BackgroundPipeline>().unwrap();
-            let pass_descriptor = RenderPassDescriptor {
-                label: Some("background_pass"),
-                color_attachments: &[Some(target.get_color_attachment())],
-                depth_stencil_attachment: None,
-                timestamp_writes: None,
-                occlusion_query_set: None,
-            };
+    let mut render_pass = ctx.begin_tracked_render_pass(pass_descriptor);
 
-            if let (Some(vertex_buffer), Some(index_buffer)) =
-                (&self.vertex_buffer, &self.index_buffer)
-            {
-                let mut render_pass = render_context
-                    .command_encoder()
-                    .begin_render_pass(&pass_descriptor);
-
-                render_pass.set_pipeline(&pipeline.render_pipeline);
-
-                render_pass.set_bind_group(0, self.diffuse_bind_group.as_ref().unwrap(), &[]);
-                render_pass.set_vertex_buffer(0, *vertex_buffer.slice(..));
-                render_pass.set_index_buffer(*index_buffer.slice(..), IndexFormat::Uint16);
-
-                render_pass.draw_indexed(0..(INDICES.len() as u32), 0, 0..1);
-            }
-        }
-
-        Ok(())
-    }
+    render_pass.set_render_pipeline(&pipeline.render_pipeline);
+    render_pass.set_bind_group(0, &diffuse_bind_group, &[]);
+    render_pass.set_vertex_buffer(0, state.vertex_buffer.as_ref().unwrap().slice(..));
+    render_pass.set_index_buffer(
+        state.index_buffer.as_ref().unwrap().slice(..),
+        IndexFormat::Uint16,
+    );
+    render_pass.draw_indexed(0..(INDICES.len() as u32), 0, 0..1);
 }
 
 pub fn handle_background_image(
