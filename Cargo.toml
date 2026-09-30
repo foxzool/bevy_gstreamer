@@ -15,7 +15,7 @@ documentation = "https://docs.rs/bevy_gstreamer"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-bevy = { version = "0.19", default-features = false, features = ["bevy_render", "bevy_core_pipeline", "bevy_asset", "bevy_winit", "bevy_pbr", "wayland"] }
+bevy = { version = "=0.20.0-rc.2", default-features = false, features = ["bevy_render", "bevy_core_pipeline", "bevy_asset", "bevy_winit", "bevy_pbr", "wayland"] }
 thiserror = "1.0"
 gstreamer = "0.23.2"
 gstreamer-app = "0.23.2"
@@ -31,7 +31,7 @@ name = "camera"
 path = "examples/camera.rs"
 
 [dev-dependencies]
-bevy = { version = "0.19" }
+bevy = { version = "=0.20.0-rc.2" }
 
 [profile.dev]
 opt-level = 1
