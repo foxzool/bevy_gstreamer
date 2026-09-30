@@ -4,15 +4,15 @@ use bevy::image::TextureFormatPixelInfo;
 use bevy::prelude::*;
 use bevy::render::extract_resource::ExtractResource;
 use bevy::render::render_resource::{
-    AddressMode, BindGroupEntries, BindGroupLayoutEntry, BindingType, BlendComponent,
-    BlendState, Buffer, BufferAddress, BufferInitDescriptor, BufferUsages, ColorTargetState,
-    ColorWrites, Extent3d, Face, FilterMode, FrontFace, IndexFormat, MultisampleState,
+    AddressMode, BindGroupEntries, BindGroupLayoutEntry, BindingType, BlendComponent, BlendState,
+    Buffer, BufferAddress, BufferInitDescriptor, BufferUsages, ColorTargetState, ColorWrites,
+    Extent3d, Face, FilterMode, FrontFace, IndexFormat, MipmapFilterMode, MultisampleState,
     PipelineLayoutDescriptor, PolygonMode, PrimitiveState, PrimitiveTopology, RawFragmentState,
     RawRenderPipelineDescriptor, RawVertexBufferLayout, RawVertexState, RenderPassDescriptor,
     RenderPipeline, SamplerBindingType, SamplerDescriptor, ShaderModuleDescriptor, ShaderSource,
     ShaderStages, TexelCopyBufferLayout, TextureDescriptor, TextureDimension, TextureFormat,
     TextureSampleType, TextureUsages, TextureViewDescriptor, TextureViewDimension, VertexAttribute,
-    VertexFormat, VertexStepMode, MipmapFilterMode,
+    VertexFormat, VertexStepMode,
 };
 use bevy::render::renderer::{RenderContext, RenderDevice, RenderQueue, ViewQuery};
 use bevy::render::view::ViewTarget;
@@ -46,6 +46,7 @@ impl Vertex {
 }
 
 #[derive(Deref, DerefMut, Default, Resource, ExtractResource, Clone)]
+#[extract_app(bevy::render::RenderApp)]
 pub struct BackgroundImage(pub Image);
 
 const VERTICES: &[Vertex] = &[
@@ -123,7 +124,7 @@ impl FromWorld for BackgroundPipeline {
                 module: &shader,
                 entry_point: Some("vs_main"),
                 compilation_options: Default::default(),
-                buffers: &[Vertex::desc()],
+                buffers: &[Some(Vertex::desc())],
             },
             fragment: Some(RawFragmentState {
                 module: &shader,
@@ -232,11 +233,7 @@ pub fn background_render_system(
         usage: TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_DST,
         view_formats: &[],
     });
-    let format_size = img
-        .texture_descriptor
-        .format
-        .pixel_size()
-        .unwrap_or(4);
+    let format_size = img.texture_descriptor.format.pixel_size().unwrap_or(4);
     queue.write_texture(
         texture.as_image_copy(),
         img.data.as_ref().expect("Image has no data"),
@@ -253,9 +250,9 @@ pub fn background_render_system(
         address_mode_u: AddressMode::ClampToEdge,
         address_mode_v: AddressMode::ClampToEdge,
         address_mode_w: AddressMode::ClampToEdge,
-                mag_filter: FilterMode::Linear,
-                min_filter: FilterMode::Nearest,
-                mipmap_filter: MipmapFilterMode::Nearest,
+        mag_filter: FilterMode::Linear,
+        min_filter: FilterMode::Nearest,
+        mipmap_filter: MipmapFilterMode::Nearest,
         ..Default::default()
     });
 
