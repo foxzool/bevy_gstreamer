@@ -132,7 +132,7 @@ impl GstCamera {
     }
 
     /// raw data from device
-    pub fn frame_raw(&mut self) -> Result<Cow<[u8]>, BevyGstError> {
+    pub fn frame_raw(&mut self) -> Result<Cow<'_, [u8]>, BevyGstError> {
         let bus = match self.pipeline.bus() {
             Some(bus) => bus,
             None => {

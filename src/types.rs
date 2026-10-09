@@ -177,7 +177,7 @@ pub fn mjpeg_to_rgb24(in_buf: &[u8]) -> Result<Vec<u8>, BevyGstError> {
     Ok(d)
 }
 pub fn yuyv422_to_rgb(data: &[u8], rgba: bool) -> Result<Vec<u8>, BevyGstError> {
-    if data.len() % 4 != 0 {
+    if !data.len().is_multiple_of(4) {
         return Err(BevyGstError::ProcessFrameError {
             src: FrameFormat::YUYV,
             destination: "RGB888".to_string(),
@@ -200,7 +200,7 @@ pub fn yuyv422_to_rgb(data: &[u8], rgba: bool) -> Result<Vec<u8>, BevyGstError> 
 /// # Errors
 /// If the stream is invalid YUYV, or the destination buffer is not large enough, this will error.
 pub fn buf_yuyv422_to_rgb(data: &[u8], dest: &mut [u8], rgba: bool) -> Result<(), BevyGstError> {
-    if data.len() % 4 != 0 {
+    if !data.len().is_multiple_of(4) {
         return Err(BevyGstError::ProcessFrameError {
             src: FrameFormat::YUYV,
             destination: "RGB888".to_string(),
