@@ -224,10 +224,11 @@ pub fn buf_yuyv422_to_rgb(data: &[u8], dest: &mut [u8], rgba: bool) -> Result<()
         });
     }
 
-    let iter = data.chunks_exact(4);
+    let (chunks, _) = data.as_chunks::<4>();
 
     if rgba {
-        let mut iter = iter
+        let mut iter = chunks
+            .iter()
             .flat_map(|yuyv| {
                 let y1 = i32::from(yuyv[0]);
                 let u = i32::from(yuyv[1]);
@@ -251,7 +252,8 @@ pub fn buf_yuyv422_to_rgb(data: &[u8], dest: &mut [u8], rgba: bool) -> Result<()
             }
         }
     } else {
-        let mut iter = iter
+        let mut iter = chunks
+            .iter()
             .flat_map(|yuyv| {
                 let y1 = i32::from(yuyv[0]);
                 let u = i32::from(yuyv[1]);
