@@ -15,7 +15,14 @@ documentation = "https://docs.rs/bevy_gstreamer"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-bevy = { version = "0.19", default-features = false, features = ["bevy_render", "bevy_core_pipeline", "bevy_asset", "bevy_winit", "bevy_pbr", "wayland"] }
+bevy = { version = "0.19", default-features = false, features = [
+  "bevy_render",
+  "bevy_core_pipeline",
+  "bevy_asset",
+  "bevy_winit",
+  "bevy_pbr",
+  "wayland",
+] }
 thiserror = "1.0"
 gstreamer = "0.23.2"
 gstreamer-app = "0.23.2"

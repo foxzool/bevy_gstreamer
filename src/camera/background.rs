@@ -4,15 +4,15 @@ use bevy::image::TextureFormatPixelInfo;
 use bevy::prelude::*;
 use bevy::render::extract_resource::ExtractResource;
 use bevy::render::render_resource::{
-    AddressMode, BindGroupEntries, BindGroupLayoutEntry, BindingType, BlendComponent,
-    BlendState, Buffer, BufferAddress, BufferInitDescriptor, BufferUsages, ColorTargetState,
-    ColorWrites, Extent3d, Face, FilterMode, FrontFace, IndexFormat, MultisampleState,
+    AddressMode, BindGroupEntries, BindGroupLayoutEntry, BindingType, BlendComponent, BlendState,
+    Buffer, BufferAddress, BufferInitDescriptor, BufferUsages, ColorTargetState, ColorWrites,
+    Extent3d, Face, FilterMode, FrontFace, IndexFormat, MipmapFilterMode, MultisampleState,
     PipelineLayoutDescriptor, PolygonMode, PrimitiveState, PrimitiveTopology, RawFragmentState,
     RawRenderPipelineDescriptor, RawVertexBufferLayout, RawVertexState, RenderPassDescriptor,
     RenderPipeline, SamplerBindingType, SamplerDescriptor, ShaderModuleDescriptor, ShaderSource,
     ShaderStages, TexelCopyBufferLayout, TextureDescriptor, TextureDimension, TextureFormat,
     TextureSampleType, TextureUsages, TextureViewDescriptor, TextureViewDimension, VertexAttribute,
-    VertexFormat, VertexStepMode, MipmapFilterMode,
+    VertexFormat, VertexStepMode,
 };
 use bevy::render::renderer::{RenderContext, RenderDevice, RenderQueue, ViewQuery};
 use bevy::render::view::ViewTarget;
@@ -169,18 +169,10 @@ impl FromWorld for BackgroundPipeline {
 /// GPU resources that persist across frames for the background pass. The vertex
 /// and index buffers are allocated lazily on first use; the texture and bind
 /// group are rebuilt every frame because the webcam image changes each frame.
+#[derive(Default)]
 pub struct BackgroundGpuState {
     vertex_buffer: Option<Buffer>,
     index_buffer: Option<Buffer>,
-}
-
-impl Default for BackgroundGpuState {
-    fn default() -> Self {
-        Self {
-            vertex_buffer: None,
-            index_buffer: None,
-        }
-    }
 }
 
 /// Renders the webcam background quad. In Bevy 0.19 this is a regular system
@@ -232,11 +224,7 @@ pub fn background_render_system(
         usage: TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_DST,
         view_formats: &[],
     });
-    let format_size = img
-        .texture_descriptor
-        .format
-        .pixel_size()
-        .unwrap_or(4);
+    let format_size = img.texture_descriptor.format.pixel_size().unwrap_or(4);
     queue.write_texture(
         texture.as_image_copy(),
         img.data.as_ref().expect("Image has no data"),
@@ -253,9 +241,9 @@ pub fn background_render_system(
         address_mode_u: AddressMode::ClampToEdge,
         address_mode_v: AddressMode::ClampToEdge,
         address_mode_w: AddressMode::ClampToEdge,
-                mag_filter: FilterMode::Linear,
-                min_filter: FilterMode::Nearest,
-                mipmap_filter: MipmapFilterMode::Nearest,
+        mag_filter: FilterMode::Linear,
+        min_filter: FilterMode::Nearest,
+        mipmap_filter: MipmapFilterMode::Nearest,
         ..Default::default()
     });
 
@@ -313,17 +301,17 @@ pub fn handle_background_image(
     mut image: ResMut<BackgroundImage>,
     mut cam_query: Query<&mut GstCamera, With<BackgroundImageMarker>>,
 ) {
-    if let Ok(mut cam) = cam_query.single_mut() {
-        if let Ok(frame) = cam.frame() {
-            let size = Extent3d {
-                width: frame.width(),
-                height: frame.height(),
-                depth_or_array_layers: 1,
-            };
-            let dimensions = TextureDimension::D2;
-            let format = TextureFormat::Rgba8Unorm;
-            let asset_usage = RenderAssetUsages::default();
-            image.0 = Image::new(size, dimensions, frame.to_vec(), format, asset_usage);
-        }
+    if let Ok(mut cam) = cam_query.single_mut()
+        && let Ok(frame) = cam.frame()
+    {
+        let size = Extent3d {
+            width: frame.width(),
+            height: frame.height(),
+            depth_or_array_layers: 1,
+        };
+        let dimensions = TextureDimension::D2;
+        let format = TextureFormat::Rgba8Unorm;
+        let asset_usage = RenderAssetUsages::default();
+        image.0 = Image::new(size, dimensions, frame.to_vec(), format, asset_usage);
     }
 }
