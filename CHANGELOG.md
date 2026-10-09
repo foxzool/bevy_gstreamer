@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.9.0] - 2026-10-09
+
+* bump bevy version to `0.20`
+* `BackgroundImage` extraction now targets `RenderApp` via `#[extract_app(RenderApp)]`
+* webcam render pipeline vertex buffer layouts are `Option`s (wgpu 30)
+
 ## [0.7.0] - 2025-04-25
 
 * bump bevy version to `0.16`

@@ -2,6 +2,7 @@ use crate::camera::{BackgroundImageMarker, GstCamera};
 use bevy::asset::RenderAssetUsages;
 use bevy::image::TextureFormatPixelInfo;
 use bevy::prelude::*;
+use bevy::render::RenderApp;
 use bevy::render::extract_resource::ExtractResource;
 use bevy::render::render_resource::{
     AddressMode, BindGroupEntries, BindGroupLayoutEntry, BindingType, BlendComponent, BlendState,
@@ -46,6 +47,7 @@ impl Vertex {
 }
 
 #[derive(Deref, DerefMut, Default, Resource, ExtractResource, Clone)]
+#[extract_app(RenderApp)]
 pub struct BackgroundImage(pub Image);
 
 const VERTICES: &[Vertex] = &[
@@ -123,7 +125,7 @@ impl FromWorld for BackgroundPipeline {
                 module: &shader,
                 entry_point: Some("vs_main"),
                 compilation_options: Default::default(),
-                buffers: &[Vertex::desc()],
+                buffers: &[Some(Vertex::desc())],
             },
             fragment: Some(RawFragmentState {
                 module: &shader,
